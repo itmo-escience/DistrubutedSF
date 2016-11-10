@@ -1,0 +1,3 @@
+[submodule "social-phys-lib-private"]
+	path = social-phys-lib-private
+	url = https://github.com/itmo-escience/social-phys-lib-private.git
