@@ -149,7 +149,20 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClCompile Include="Master.cpp" />
+    <ClCompile Include="Slave.cpp" />
     <ClCompile Include="Source.cpp" />
+    <ClCompile Include="Utils.cpp" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\social-phys-lib-private\SF\SF.vcxproj">
+      <Project>{31e38dac-ca22-4c3b-8c14-5a14d3290443}</Project>
+    </ProjectReference>
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="Master.h" />
+    <ClInclude Include="Slave.h" />
+    <ClInclude Include="Utils.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
