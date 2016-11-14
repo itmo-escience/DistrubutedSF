@@ -36,6 +36,7 @@ int main(int argc, char* argv[])
 	MPI_Init(&argc, &argv);
 	MPI_Comm_rank(MPI_COMM_WORLD, &myRank);
 	MPI_Comm_size(MPI_COMM_WORLD, &commSize);
+	pair<Vector2, Vector2> myArea;
 
 
 	MPI_Get_library_version(version, &len);
@@ -61,6 +62,57 @@ int main(int argc, char* argv[])
 	float minimalHeight = 20;
 	vector<pair<Vector2, Vector2>> areas = DivideModelingArea(obstacles, minimalWidth, minimalHeight);
 
+	float minX;
+	float minY;
+	float maxX;
+	float maxY;
+
+	if(myRank == 0)
+	{
+		cout << "areas: " << areas.size() << endl;
+		for (int i = 1; i <= areas.size(); i++)
+		{
+			//cout << "I'm : " << myRank << " sending to: " << i << endl;
+			minX = areas[i - 1].first.x();
+			MPI_Send(&minX, 1, MPI_FLOAT, i, 1, MPI_COMM_WORLD);
+			
+			minY = areas[i - 1].first.y();
+			MPI_Send(&minY, 1, MPI_FLOAT, i, 1, MPI_COMM_WORLD);
+
+			maxX = areas[i - 1].second.x();
+			MPI_Send(&maxX, 1, MPI_FLOAT, i, 1, MPI_COMM_WORLD);
+
+			maxY = areas[i - 1].second.y();
+			MPI_Send(&maxY, 1, MPI_FLOAT, i, 1, MPI_COMM_WORLD);
+		}
+	}
+	else
+	{
+		if(myRank <= areas.size())
+		{
+			cout << "I'm : " << myRank << " receiving from: " << 0 << " areas: " <<areas.size()<< endl;
+			MPI_Recv(&minX, 1, MPI_FLOAT, 0, 1, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
+			MPI_Recv(&minY, 1, MPI_FLOAT, 0, 1, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
+			MPI_Recv(&maxX, 1, MPI_FLOAT, 0, 1, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
+			MPI_Recv(&maxY, 1, MPI_FLOAT, 0, 1, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
+
+			Vector2 minPoint(minX, minY);
+			Vector2 maxPoint(maxX, maxY);
+			myArea = make_pair(minPoint, maxPoint);
+		}
+		//else
+		//{
+		//	cout << "I'm : " << myRank << " not enough areas for me." << endl;
+		//}
+	}
+
+	MPI_Barrier(MPI_COMM_WORLD);
+	if(myRank != 0 && myRank <= areas.size())
+	{
+		cout << "I'm rank: " << myRank << " my area: x= " << myArea.first.x() << " y= " << myArea.first.y() << " x= " << myArea.second.x() << " y= " << myArea.second.y() << endl;
+	}
+
+
 	//if(myRank > 0)
 	//{
 	//	int myAreaIndex = myRank - 1;
@@ -71,13 +123,13 @@ int main(int argc, char* argv[])
 	//	}
 	//}
 
-	if(myRank == 0)
-	{
-		for (int i = 0; i < areas.size(); i++)
-		{
-			cout << "Area " << i << ":" << "x1: " << areas[i].first.x() << " y1: " << areas[i].first.y() << " x2: " << areas[i].second.x() << " y2: " << areas[i].second.y() << endl;
-		}
-	}
+	//if(myRank == 0)
+	//{
+	//	for (int i = 0; i < areas.size(); i++)
+	//	{
+	//		cout << "Area " << i << ":" << "x1: " << areas[i].first.x() << " y1: " << areas[i].first.y() << " x2: " << areas[i].second.x() << " y2: " << areas[i].second.y() << endl;
+	//	}
+	//}
 
 	SFSimulator simulator;
 
@@ -99,7 +151,7 @@ int main(int argc, char* argv[])
 	if(myRank == 0)
 	{
 
-		cout << "Im rank " << endl;
+		//cout << "Im rank " << endl;
 		//Master master;
 		//master.Run();
 	}
@@ -270,7 +322,7 @@ vector<pair<Vector2, Vector2>> DivideModelingArea(const vector<vector<Vector2>> 
 	pair<Vector2, Vector2> pair_(pointA, pointB);
 	resultAreas.push_back(pair_);
 
-	//commSize = 10;
+	//commSize = 5;
 
 	if (commSize > 2)
 	{
@@ -281,34 +333,42 @@ vector<pair<Vector2, Vector2>> DivideModelingArea(const vector<vector<Vector2>> 
 			bool areaWasDivided = false;
 			for (int i = 0; i < currIterationVectSize; i++)
 			{
-				if (resultAreas[i].second.x() - resultAreas[i].first.x() > minimalWidth && resultAreas[i].second.y() - resultAreas[i].first.y() > minimalHeight)
+				if (resultAreas[i].second.x() - resultAreas[i].first.x() <= resultAreas[i].second.y() - resultAreas[i].first.y()) //horizontal dividing
 				{
-					if (resultAreas[i].second.x() - resultAreas[i].first.x() <= resultAreas[i].second.y() - resultAreas[i].first.y()) //horizontal dividing
+					//if ((resultAreas[i].second.x() - resultAreas[i].first.x()) / 2 >= minimalWidth && (resultAreas[i].second.y() - resultAreas[i].first.y()) / 2 >= minimalHeight)
+					if((resultAreas[i].second.y() - resultAreas[i].first.y()) / 2 < minimalHeight)
 					{
-						float newMaxY = resultAreas[i].first.y() + ((resultAreas[i].second.y() - resultAreas[i].first.y()) / 2);
-						Vector2 pointA2(resultAreas[i].first.x(), newMaxY);
-						Vector2 pointB2(resultAreas[i].second.x(), resultAreas[i].second.y());
-						pair<Vector2, Vector2> pair2(pointA2, pointB2);
-						resultAreas.push_back(pair2);
-
-						Vector2 pointA1(resultAreas[i].first.x(), resultAreas[i].first.y());
-						Vector2 pointB1(resultAreas[i].second.x(), newMaxY);
-						pair<Vector2, Vector2> pair1(pointA1, pointB1);
-						resultAreas[i] = pair1;
+						continue;
 					}
-					else //Vertical dividing
+					float newMaxY = resultAreas[i].first.y() + ((resultAreas[i].second.y() - resultAreas[i].first.y()) / 2);
+					Vector2 pointA2(resultAreas[i].first.x(), newMaxY);
+					Vector2 pointB2(resultAreas[i].second.x(), resultAreas[i].second.y());
+					pair<Vector2, Vector2> pair2(pointA2, pointB2);
+					resultAreas.push_back(pair2);
+
+					Vector2 pointA1(resultAreas[i].first.x(), resultAreas[i].first.y());
+					Vector2 pointB1(resultAreas[i].second.x(), newMaxY);
+					pair<Vector2, Vector2> pair1(pointA1, pointB1);
+					resultAreas[i] = pair1;
+
+					areaWasDivided = true;
+				}
+				else //Vertical dividing
+				{
+					if ((resultAreas[i].second.x() - resultAreas[i].first.x()) / 2 < minimalWidth)
 					{
-						float newMaxX = resultAreas[i].first.x() + ((resultAreas[i].second.x() - resultAreas[i].first.x()) / 2);
-						Vector2 pointA2(newMaxX, resultAreas[i].first.y());
-						Vector2 pointB2(resultAreas[i].second.x(), resultAreas[i].second.y());
-						pair<Vector2, Vector2> pair2(pointA2, pointB2);
-						resultAreas.push_back(pair2);
-
-						Vector2 pointA1(resultAreas[i].first.x(), resultAreas[i].first.y());
-						Vector2 pointB1(newMaxX, resultAreas[i].second.y());
-						pair<Vector2, Vector2> pair1(pointA1, pointB1);
-						resultAreas[i] = pair1;
+						continue;
 					}
+					float newMaxX = resultAreas[i].first.x() + ((resultAreas[i].second.x() - resultAreas[i].first.x()) / 2);
+					Vector2 pointA2(newMaxX, resultAreas[i].first.y());
+					Vector2 pointB2(resultAreas[i].second.x(), resultAreas[i].second.y());
+					pair<Vector2, Vector2> pair2(pointA2, pointB2);
+					resultAreas.push_back(pair2);
+
+					Vector2 pointA1(resultAreas[i].first.x(), resultAreas[i].first.y());
+					Vector2 pointB1(newMaxX, resultAreas[i].second.y());
+					pair<Vector2, Vector2> pair1(pointA1, pointB1);
+					resultAreas[i] = pair1;
 
 					areaWasDivided = true;
 				}
