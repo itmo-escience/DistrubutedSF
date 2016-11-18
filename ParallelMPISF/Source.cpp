@@ -29,7 +29,7 @@ void SendObstacle(vector<Vector2> obstacle);
 vector<Vector2> ReceiveObstacle();
 void SendAgentPosition(Vector2 agentsPosition);
 Vector2 ReceiveAgentPosition();
-vector<pair<Vector2, Vector2>> DivideModelingArea(const vector<vector<Vector2>> &obstacles, float minimalWidth, float minimalHeight);
+vector<pair<Vector2, Vector2>> DivideModelingArea(const pair<Vector2, Vector2> &globalArea, float minimalWidth, float minimalHeight);
 pair<Vector2, Vector2> CreateModelingArea(vector<vector<Vector2>> &obstacles, Vector2 minPoint, Vector2 maxPoint, float borderWidth);
 int SendAgent(MPIAgent agent, int dest);
 float GenerateRandomBetween(float LO, float HI);
@@ -111,7 +111,7 @@ int main(int argc, char* argv[])
 		simulator.setAgentDefaults(*defaultAgentConfig);
 	}
 
-	delete serializedDefaultAgentConfig;
+	delete[] serializedDefaultAgentConfig;
 
 	//cout << "MyRank: " << myRank << " Properties: " << endl;
 	//defaultAgentConfig->PrintDefaultProperties();
@@ -122,36 +122,157 @@ int main(int argc, char* argv[])
 	vector<vector<Vector2>> obstacles;
 	vector<Vector2> agentsPositions;
 
+	LoadData(obstacles, agentsPositions);
+
 	Vector2 p1(atoi(argv[1]), atoi(argv[2])); //Minimal point of modeling area
 	Vector2 p2(atoi(argv[3]), atoi(argv[4])); //Maximal point of modeling area
 	pair<Vector2, Vector2> globalArea = CreateModelingArea(obstacles, p1, p2, 1); //Create obstacle around modeling area (rectangle)
-
-	LoadData(obstacles, agentsPositions);
 
 	//Agent radius where it interact with anothers
 	float minimalWidth = atoi(argv[5]);
 	float minimalHeight = atoi(argv[5]);
 
-	modelingAreas = DivideModelingArea(obstacles, minimalWidth, minimalHeight);
+	modelingAreas = DivideModelingArea(globalArea, minimalWidth, minimalHeight);
+
+
 
 	if(myRank == 0)
 	{
 		SaveObstaclesToJSON(obstacles, "Obstacles.txt");
 	}
 
-	MPI_Barrier(MPI_COMM_WORLD);
-	if (myRank != 0)
+	//MPI_Barrier(MPI_COMM_WORLD);
+	//if (myRank != 0)
+	//{
+	//	if (myRank <= modelingAreas.size())
+	//	{
+	//		cout << "I'm rank: " << myRank << " my area: x= " << modelingAreas[myRank - 1].first.x() << " y= " << modelingAreas[myRank - 1].first.y() << " x= " << modelingAreas[myRank - 1].second.x() << " y= " << modelingAreas[myRank - 1].second.y() << endl;
+	//	}
+	//	else
+	//	{
+	//		cout << "My rank:" << myRank << " Not enough areas for me" << endl;
+	//	}
+	//}
+#pragma endregion Modeling area partitioning
+
+#pragma region Bcasting obstacles
+if(myRank == 0)
+{
+	//vector size calculating
+	int bufferSize = 0;
+	bufferSize += sizeof(int); //number of obstacles
+	for(int i = 0; i < obstacles.size(); i++)
 	{
-		if (myRank <= modelingAreas.size())
+		bufferSize += sizeof(int); //number of points
+		for(int j = 0; j < obstacles[i].size(); j++)
 		{
-			cout << "I'm rank: " << myRank << " my area: x= " << modelingAreas[myRank - 1].first.x() << " y= " << modelingAreas[myRank - 1].first.y() << " x= " << modelingAreas[myRank - 1].second.x() << " y= " << modelingAreas[myRank - 1].second.y() << endl;
-		}
-		else
-		{
-			cout << "My rank:" << myRank << " Not enough areas for me" << endl;
+			bufferSize += 2 * sizeof(float);
 		}
 	}
-#pragma endregion Modeling area partitioning
+
+	// The buffer we will be writing bytes into
+	unsigned char* outBuf = new unsigned char[bufferSize];
+	cout << "Rank: " << myRank << " buffer size: " << bufferSize << endl;
+
+	// A pointer we will advance whenever we write data
+	unsigned char* p = outBuf;
+
+	int listSize = obstacles.size();
+	cout << "Rank: " << myRank << " "<< listSize << " objects prepare to sending"<< endl;
+	memcpy(p, &listSize, sizeof(int));
+	p += sizeof(int);
+	cout << "Rank: " << myRank << " written:  " << p - outBuf << endl;
+
+	for(int i = 0; i < obstacles.size(); i++)
+	{
+		int pointsNumInObstacle = obstacles[i].size();
+		memcpy(p, &pointsNumInObstacle, sizeof(int));
+		p += sizeof(int);
+		cout << "Rank: " << myRank << " written:  " << p - outBuf << endl;
+		cout << "Rank: " << myRank << " " << pointsNumInObstacle << " points would be written serialized." << endl;
+		for(int j = 0; j < obstacles[i].size(); j++)
+		{
+			float x = obstacles[i][j].x();
+			memcpy(p, &x, sizeof(float));
+			p += sizeof(float);
+			cout << "Rank: " << myRank << " written:  " << p - outBuf << endl;
+			cout << "Rank: " << myRank << " point " << x << " serialized." << endl;
+
+			float y = obstacles[i][j].y();
+			memcpy(p, &y, sizeof(float));
+			p += sizeof(float);
+			cout << "Rank: " << myRank << " written:  " << p - outBuf << endl;
+			cout << "Rank: " << myRank << " point " << y << " serialized." << endl;
+		}
+	}
+
+	MPI_Bcast(&bufferSize, 1, MPI_INT, 0, MPI_COMM_WORLD);
+	cout << "Rank: " << myRank << " buffer size bcasted: " << bufferSize << endl;
+	MPI_Bcast(outBuf, bufferSize, MPI_UNSIGNED_CHAR, 0, MPI_COMM_WORLD);
+	cout << "Rank: " << myRank << " array bcasted: " << bufferSize << endl;
+	delete[] outBuf;
+	cout << "Rank: " << myRank << " delete operation performed." << endl;
+}
+else
+{
+	int arrayLength;
+	MPI_Bcast(&arrayLength, 1, MPI_INT, 0, MPI_COMM_WORLD);
+	cout << "Rank: " << myRank << " array size obtained: " << arrayLength << endl;
+	unsigned char* obstacleArray = new unsigned char[arrayLength];
+	// A pointer we will advance whenever we write data
+
+	MPI_Bcast(obstacleArray, arrayLength, MPI_UNSIGNED_CHAR, 0, MPI_COMM_WORLD);
+	cout << "Rank: " << myRank << " array obtailned." << endl;
+
+	unsigned char* p = obstacleArray;
+
+	//obstacles deserializing
+	int obstaclesNum = 0;
+	memcpy(&obstaclesNum, p, sizeof(obstaclesNum));
+	p += sizeof(obstaclesNum);
+	cout << "Rank: " << myRank << " in array " << obstaclesNum << " elements" << endl;
+	
+
+	for(int i = 0; i < obstaclesNum; i++)
+	{
+		int pointsNum = 0;
+		memcpy(&pointsNum, p, sizeof(pointsNum));
+		p += sizeof(pointsNum);
+		cout << "Rank: " << myRank << " there " << pointsNum << " points" << endl;
+
+		vector<Vector2> obstacle;
+		for(int j = 0; j < pointsNum; j++)
+		{
+			float x = 0;
+			memcpy(&x, p, sizeof(x));
+			p += sizeof(x);
+			//cout << "Rank: " << myRank << " x: " << x << "" << endl;
+
+			float y = 0;
+			memcpy(&y, p, sizeof(y));
+			p += sizeof(y);
+			//cout << "Rank: " << myRank << " y: " << y << "" << endl;
+			obstacle.push_back(Vector2(x, y));
+		}
+
+		obstacles.push_back(obstacle);
+	}
+
+	delete[] obstacleArray;
+	cout << "Rank: " << myRank << " delete operation performed." << endl;
+
+	for(int i = 0; i < obstacles.size(); i++)
+	{
+		simulator.addObstacle(obstacles[i]);
+	}
+	simulator.processObstacles();
+	cout << "Rank: " << myRank << " all obstacles proceesed." << endl;
+}
+
+
+
+
+#pragma endregion Bcasting obstacles
 
 #pragma region Broadcasting generated agents
 
@@ -298,7 +419,7 @@ int main(int argc, char* argv[])
 				{
 					if (AgentsPositions[it->first].x() <= 175)
 					{
-						xVel = 1;
+						xVel = 5;
 						yVel = 0;
 					}
 					else //if they reached their destination
@@ -311,7 +432,7 @@ int main(int argc, char* argv[])
 				{
 					if (AgentsPositions[it->first].x() >= 25)
 					{
-						xVel = -1;
+						xVel = -5;
 						yVel = 0;
 					}
 					else //if they reached their destination
@@ -426,6 +547,10 @@ int main(int argc, char* argv[])
 			} while (destinationNode > 0);
 
 			//cout << "Rank: " << myRank << " negative destination received." << endl;
+
+			//cout << "Rank: " << myRank << endl;
+			//simulator.printAgentsInfo();
+			
 
 			//Do simulation step
 			simulator.doStep();
@@ -642,36 +767,13 @@ Vector2 ReceiveAgentPosition()
 }
 
 //Dividing modeling area to subareas for each nodes. If subarea is smaller than minimal width or height it is not dividing more 
-vector<pair<Vector2, Vector2>> DivideModelingArea(const vector<vector<Vector2>> &obstacles, float minimalWidth, float minimalHeight)
+vector<pair<Vector2, Vector2>> DivideModelingArea(const pair<Vector2, Vector2> &globalArea, float minimalWidth, float minimalHeight)
 {
-	float minX = INT_MAX;
-	float minY = INT_MAX;
-	float maxX = INT_MIN;
-	float maxY = INT_MIN;
+	float minX = globalArea.first.x();
+	float minY = globalArea.first.y();
+	float maxX = globalArea.second.x();
+	float maxY = globalArea.second.y();
 	
-	for(int i = 0; i < obstacles.size(); i++)
-	{
-		for(int j = 0; j < obstacles[i].size(); j++)
-		{
-			if(obstacles[i][j].x() < minX)
-			{
-				minX = obstacles[i][j].x();
-			}
-			if (obstacles[i][j].y() < minY)
-			{
-				minY = obstacles[i][j].y();
-			}
-			if (obstacles[i][j].x() > maxX)
-			{
-				maxX = obstacles[i][j].x();
-			}
-			if (obstacles[i][j].y() > maxY)
-			{
-				maxY = obstacles[i][j].y();
-			}
-		}
-	}
-
 	vector<pair<Vector2, Vector2>> resultAreas;
 	Vector2 pointA(minX, minY);
 	Vector2 pointB(maxX, maxY);
