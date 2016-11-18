@@ -7,6 +7,8 @@ Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "ParallelMPISF", "ParallelMP
 EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "SF", "social-phys-lib-private\SF\SF.vcxproj", "{31E38DAC-CA22-4C3B-8C14-5A14D3290443}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "AgentsMovingVis", "AgentsMovingVis\AgentsMovingVis.csproj", "{B2D4C1E7-9EA9-4AB7-B1A1-E20D5DEEE0C2}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|x64 = Debug|x64
@@ -31,6 +33,12 @@ Global
 		{31E38DAC-CA22-4C3B-8C14-5A14D3290443}.Release|x64.Build.0 = Release|x64
 		{31E38DAC-CA22-4C3B-8C14-5A14D3290443}.Release|x86.ActiveCfg = Release|Win32
 		{31E38DAC-CA22-4C3B-8C14-5A14D3290443}.Release|x86.Build.0 = Release|Win32
+		{B2D4C1E7-9EA9-4AB7-B1A1-E20D5DEEE0C2}.Debug|x64.ActiveCfg = Debug|x86
+		{B2D4C1E7-9EA9-4AB7-B1A1-E20D5DEEE0C2}.Debug|x86.ActiveCfg = Debug|x86
+		{B2D4C1E7-9EA9-4AB7-B1A1-E20D5DEEE0C2}.Debug|x86.Build.0 = Debug|x86
+		{B2D4C1E7-9EA9-4AB7-B1A1-E20D5DEEE0C2}.Release|x64.ActiveCfg = Release|x86
+		{B2D4C1E7-9EA9-4AB7-B1A1-E20D5DEEE0C2}.Release|x86.ActiveCfg = Release|x86
+		{B2D4C1E7-9EA9-4AB7-B1A1-E20D5DEEE0C2}.Release|x86.Build.0 = Release|x86
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
