@@ -3,13 +3,13 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
+using Microsoft.Xna.Framework;
 
 namespace AgentsMovingVis
 {
-    public class Agent
+    class Obstacle
     {
-        public string agentID { get; set; }
-        public float X { get; set; }
-        public float Y { get; set; }
+        public uint obstacleID { get; set; }
+        public List<FloatPoint> points { get; set; }
     }
 }

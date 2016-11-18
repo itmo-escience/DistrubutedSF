@@ -6,10 +6,9 @@ using System.Threading.Tasks;
 
 namespace AgentsMovingVis
 {
-    public class Agent
+    class FloatPoint
     {
-        public string agentID { get; set; }
-        public float X { get; set; }
-        public float Y { get; set; }
+        public float X;
+        public float Y;
     }
 }

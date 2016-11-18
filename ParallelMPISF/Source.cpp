@@ -33,6 +33,7 @@ vector<pair<Vector2, Vector2>> DivideModelingArea(const vector<vector<Vector2>> 
 pair<Vector2, Vector2> CreateModelingArea(vector<vector<Vector2>> &obstacles, Vector2 minPoint, Vector2 maxPoint, float borderWidth);
 int SendAgent(MPIAgent agent, int dest);
 float GenerateRandomBetween(float LO, float HI);
+void SaveObstaclesToJSON(vector<vector<Vector2>> obstacles, string path);
 
 using namespace SF;
 
@@ -133,6 +134,11 @@ int main(int argc, char* argv[])
 
 	modelingAreas = DivideModelingArea(obstacles, minimalWidth, minimalHeight);
 
+	if(myRank == 0)
+	{
+		SaveObstaclesToJSON(obstacles, "Obstacles.txt");
+	}
+
 	MPI_Barrier(MPI_COMM_WORLD);
 	if (myRank != 0)
 	{
@@ -145,9 +151,6 @@ int main(int argc, char* argv[])
 			cout << "My rank:" << myRank << " Not enough areas for me" << endl;
 		}
 	}
-
-
-
 #pragma endregion Modeling area partitioning
 
 #pragma region Broadcasting generated agents
@@ -815,3 +818,43 @@ pair<Vector2, Vector2> CreateModelingArea(vector<vector<Vector2>> &obstacles, Ve
 //
 //	return 0;
 //}
+
+void SaveObstaclesToJSON(vector<vector<Vector2>> obstacles, string path)
+{
+	std::fstream agentsPositionsFile;
+	agentsPositionsFile.open(path, ios::out | ios::trunc);
+	agentsPositionsFile << "[" << endl;
+
+	for(int obst = 0; obst < obstacles.size(); obst++)
+	{
+		agentsPositionsFile << "{" << endl;
+		agentsPositionsFile << "\"obstacleID\": " << obst <<","<< endl;
+		agentsPositionsFile << "\"points\": [" << endl;
+		for(int point = 0; point < obstacles[obst].size(); point++)
+		{
+			agentsPositionsFile << "{" << endl;
+			agentsPositionsFile << "\"X\" : " << obstacles[obst][point].x()<< "," << endl;
+			agentsPositionsFile << "\"Y\" : " << obstacles[obst][point].y() << endl;
+			if(point < obstacles[obst].size() - 1)
+			{
+				agentsPositionsFile << "}," << endl;
+			}
+			else
+			{
+				agentsPositionsFile << "}" << endl;
+			}
+		}
+		agentsPositionsFile << "]" << endl;
+		if(obst < obstacles.size() - 1)
+		{
+			agentsPositionsFile << "}," << endl;
+		}
+		else
+		{
+			agentsPositionsFile << "}" << endl;
+		}
+	}
+
+	agentsPositionsFile << "]" << endl;
+	agentsPositionsFile.close();
+}

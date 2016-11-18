@@ -18,12 +18,15 @@ namespace AgentsMovingVis
         GraphicsDeviceManager graphics;
         SpriteBatch spriteBatch;
         private List<Iteration> simulationData;
+        private List<Obstacle> obstacles;
+
         //     private List<Obstacle> obstacles;
         double timeFromLastUpdate = 0;
         double timeToAgentStep = 100;
         private Vector2 offset;
         private int previousScrollValue;
 
+        private Texture2D onePixelTexture;
         private Texture2D agentTexture2D;
         private SpriteFont Font;
         private int currentIteration = 0;
@@ -53,10 +56,15 @@ namespace AgentsMovingVis
             Window.AllowUserResizing = true;
             Window.ClientSizeChanged += new EventHandler<EventArgs>(Window_ClientSizeChanged);
 
-            string path = @"simData.txt";
+            string simDataPath = @"simData.txt";
             string json = "";
-            json = File.ReadAllText(path);
+            json = File.ReadAllText(simDataPath);
             simulationData = JsonConvert.DeserializeObject<List<Iteration>>(json);
+
+
+            string obstPath = @"Obstacles.txt";
+            json = File.ReadAllText(obstPath);
+            obstacles = JsonConvert.DeserializeObject<List<Obstacle>>(json);
 
             base.Initialize();
         }
@@ -71,6 +79,8 @@ namespace AgentsMovingVis
             spriteBatch = new SpriteBatch(GraphicsDevice);
             agentTexture2D = Content.Load<Texture2D>("agent");
             Font = Content.Load<SpriteFont>("Arial");
+            onePixelTexture = CreateTexture2D(Color.Aquamarine, 1, 1);
+
             // TODO: use this.Content to load your game content here
         }
 
@@ -81,6 +91,7 @@ namespace AgentsMovingVis
         protected override void UnloadContent()
         {
             agentTexture2D.Dispose();
+            onePixelTexture.Dispose();
             // TODO: Unload any non ContentManager content here
         }
 
@@ -103,13 +114,13 @@ namespace AgentsMovingVis
                 int currentWheelValue = mouseState.ScrollWheelValue;
                 if (currentWheelValue > previousScrollValue)
                 {
-                    zoom += zoom <= 10 ? 0.05f : 0;
+                    zoom += zoom <= 10 ? 0.1f : 0;
                 }
                 else
                 {
                     if (currentWheelValue < previousScrollValue)
                     {
-                        zoom -= zoom >= -10 ? 0.05f : 0;
+                        zoom -= zoom >= -10 ? 0.1f : 0;
                     }
                 }
                 previousScrollValue = Mouse.GetState().ScrollWheelValue;
@@ -194,13 +205,29 @@ namespace AgentsMovingVis
             spriteBatch.Begin();
             try
             {
-                GraphicsDevice.Clear(Color.LightGray);
+                GraphicsDevice.Clear(Color.Black);
 
+                ////drawing obstacles
+                for (int i = 0; i < obstacles.Count; i++)
+                {
+                    for (int j = 0; j < obstacles[i].points.Count - 1; j++)
+                    {
+                        float x1 = (obstacles[i].points[j].X * zoom) + offset.X;
+                        float y1 = (obstacles[i].points[j].Y * zoom) + offset.Y;
+
+                        float x2 = (obstacles[i].points[j + 1].X * zoom) + offset.X;
+                        float y2 = (obstacles[i].points[j + 1].Y * zoom) + offset.Y;
+
+                        DrawLine(spriteBatch, new Vector2(x1, y1), new Vector2(x2, y2), Color.Blue, 2);
+                    }
+                }
+
+                //drawing agents
                 for (int i = 0; i < simulationData[currentIteration].agents.Count; i++)
                 {
-                    float x = Convert.ToSingle(simulationData[currentIteration].agents[i].X.Replace('.', ','));
-                    float y = Convert.ToSingle(simulationData[currentIteration].agents[i].Y.Replace('.', ','));
-                    spriteBatch.Draw(agentTexture2D, new Vector2(offset.X + (x * zoom) - agentTexture2D.Width /2, offset.Y + (y * zoom) - agentTexture2D.Width/2), null, Color.White, 0.0f, new Vector2(0, 0), new Vector2(0.05f, 0.05f), SpriteEffects.None, 0);
+                    float x = simulationData[currentIteration].agents[i].X;
+                    float y = simulationData[currentIteration].agents[i].Y;
+                    spriteBatch.Draw(agentTexture2D, new Vector2(offset.X + (x * zoom), offset.Y + (y * zoom)), null, Color.White, 0.0f, new Vector2(0, 0), new Vector2(0.05f, 0.05f), SpriteEffects.None, 0);
                 }
 
                 spriteBatch.DrawString(Font, "zoom: " + zoom.ToString(), new Vector2(50, 50), Color.Red, 0f, Vector2.Zero, new Vector2(1, 1), SpriteEffects.None, 0);
@@ -219,5 +246,23 @@ namespace AgentsMovingVis
             graphics.PreferredBackBufferWidth = Window.ClientBounds.Width;
             graphics.PreferredBackBufferHeight = Window.ClientBounds.Height;
         }
+        public void DrawLine(SpriteBatch spriteBatch, Vector2 begin, Vector2 end, Color color, int width = 1)
+        {
+            Rectangle r = new Rectangle((int)(begin.X - width / 2.0), (int)(begin.Y - width / 2.0), (int)(end - begin).Length(), width);
+            Vector2 v = Vector2.Normalize(begin - end);
+            float angle = (float)Math.Acos(Vector2.Dot(v, -Vector2.UnitX));
+            if (begin.Y > end.Y) angle = MathHelper.TwoPi - angle;
+
+            spriteBatch.Draw(onePixelTexture, r, null, color, angle, Vector2.Zero, SpriteEffects.None, 0);
+        }
+
+        public Texture2D CreateTexture2D(Color color, int h = 1, int w = 1)
+        {
+            Texture2D texture = new Texture2D(GraphicsDevice, h, w, false, SurfaceFormat.Color);
+            texture.SetData<Color>(new Color[] { color });
+            return texture;
+        }
     }
+
+
 }
