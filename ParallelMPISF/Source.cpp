@@ -1,21 +1,13 @@
-/*
-* Copyright (c) 2004-2006 The Trustees of Indiana University and Indiana
-*                         University Research and Technology
-*                         Corporation.  All rights reserved.
-* Copyright (c) 2006      Cisco Systems, Inc.  All rights reserved.
-*
-* Sample MPI "hello world" application in C
-*/
-
 #include <stdio.h>
 #include "mpi.h"
 
 #include <stdlib.h>     /* srand, rand */
 #include <time.h>       /* time */
 #include <iostream>
-#include "../social-phys-lib-private/SF/MPIAgent.h"
-
 #include <fstream>
+#include "../social-phys-lib-private/SF/MPIAgent.h"
+#include <set>
+
 using namespace std;
 using namespace SF;
 
@@ -32,7 +24,7 @@ int SendAgent(MPIAgent agent, int dest);
 float GenerateRandomBetween(float LO, float HI);
 void SaveObstaclesToJSON(vector<vector<Vector2>> obstacles, string path);
 
-using namespace SF;
+
 
 struct nodeAgent {
 	bool isDeleted;
@@ -64,6 +56,7 @@ int main(int argc, char* argv[])
 	std::map<long long, Vector2> AgentsPositions;
 	SFSimulator simulator;
 
+cout << "Rank: " << myRank << " Agent properties bcasting" << endl;
 #pragma region AgentPropertyConfig MPI_BCasting
 	unsigned char* serializedDefaultAgentConfig;
 	AgentPropertyConfig* defaultAgentConfig;
@@ -115,6 +108,7 @@ int main(int argc, char* argv[])
 
 #pragma endregion AgentPropertyConfig MPI_BCasting
 
+cout << "Rank: " << myRank << " Area  partitioning" << endl;
 #pragma region Modeling area partitioning
 	vector<vector<Vector2>> obstacles;
 	vector<Vector2> agentsPositions;
@@ -131,27 +125,13 @@ int main(int argc, char* argv[])
 
 	modelingAreas = DivideModelingArea(globalArea, minimalWidth, minimalHeight);
 
-
-
 	if(myRank == 0)
 	{
 		SaveObstaclesToJSON(obstacles, "Obstacles.txt");
 	}
-
-	//MPI_Barrier(MPI_COMM_WORLD);
-	//if (myRank != 0)
-	//{
-	//	if (myRank <= modelingAreas.size())
-	//	{
-	//		cout << "I'm rank: " << myRank << " my area: x= " << modelingAreas[myRank - 1].first.x() << " y= " << modelingAreas[myRank - 1].first.y() << " x= " << modelingAreas[myRank - 1].second.x() << " y= " << modelingAreas[myRank - 1].second.y() << endl;
-	//	}
-	//	else
-	//	{
-	//		cout << "My rank:" << myRank << " Not enough areas for me" << endl;
-	//	}
-	//}
 #pragma endregion Modeling area partitioning
 
+cout << "Rank: " << myRank << " Bcasting obstacles " << endl;
 #pragma region Bcasting obstacles
 if(myRank == 0)
 {
@@ -401,7 +381,8 @@ else
 		if (myRank == 0) //ON MAIN NODE
 		{
 			agentsPositionsFile << "{\"iteration\": \"" << iter << "\"," << endl;
-			//Calculating velocity vectors and send it to nodes
+
+			#pragma region SENDING AGENTS VELOCITIES
 			for (std::map<long long, nodeAgent>::iterator it = AgentsIDMap.begin(); it != AgentsIDMap.end(); ++it)
 			{
 				agentId = it->second._agentID;
@@ -439,13 +420,12 @@ else
 				MPI_Send(&yVel, 1, MPI_FLOAT, destinationNode, 0, MPI_COMM_WORLD);
 			}
 
-			//End of broadcasting
+			//End of broadcasting flag
 			destinationNode = -1;
 			MPI_Bcast(&destinationNode, 1, MPI_INT, 0, MPI_COMM_WORLD);
+			#pragma endregion sending agents velocities
 
-			MPI_Barrier(MPI_COMM_WORLD);
-
-			//Requesting agents new positions
+			#pragma region REQUESTING NEW POSITION
 			for (int areas = 0; areas < modelingAreas.size(); areas++)
 			{
 				int nodeID = areas + 1;
@@ -485,8 +465,109 @@ else
 					}
 				}
 			}
+			#pragma endregion requesting agents new positions
 
-			MPI_Barrier(MPI_COMM_WORLD);
+			#pragma region AGENTS SHIFTING
+			map<long long, MPIAgent> agentsToShift;
+			cout << "Rank: " << myRank << " Sending agents IDs for deleting from simulators"<< endl;
+			for (std::map<long long, nodeAgent>::iterator it= AgentsIDMap.begin(); it != AgentsIDMap.end(); ++it)
+			{
+				if(!it->second.isDeleted)
+				{
+					float x = AgentsPositions[it->first].x();
+					float y = AgentsPositions[it->first].y();
+					int node = it->second._nodeID;
+					if(x < modelingAreas[node - 1].first.x() || modelingAreas[node - 1].second.x() < x || //outside of its modeling area
+					   y < modelingAreas[node - 1].first.y() || modelingAreas[node - 1].second.y() < y)
+					{
+						cout << "agent in coords: " << x << " " << y << " not insize a area: x:" << modelingAreas[node - 1].first.x() << " y:" << modelingAreas[node - 1].first.y() << " x:" << modelingAreas[node - 1].second.x() << " y:" << modelingAreas[node - 1].second.y() << endl; 
+						int destination = it->second._nodeID;
+						MPI_Bcast(&destination, 1, MPI_INT, 0, MPI_COMM_WORLD);
+						cout << "Rank: " << myRank << " Bcasted destination node: " << destination << endl;
+						MPI_Send(&it->second._agentID, 1, MPI_UNSIGNED_LONG_LONG, destination, 0, MPI_COMM_WORLD);
+						cout << "Rank: " << myRank << " ID sended: " << it->second._agentID << endl;
+						int serializedAgentSize = 0;
+						MPI_Recv(&serializedAgentSize, 1, MPI_INT, destination, 0, MPI_COMM_WORLD, MPI_STATUSES_IGNORE);
+						cout << "Rank: " << myRank << " Receiving serialized agent with size: " << serializedAgentSize << endl;
+						unsigned char* serializedAgent = new unsigned char[serializedAgentSize];
+						MPI_Recv(serializedAgent, serializedAgentSize, MPI_UNSIGNED_CHAR, destination, 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
+						cout << "Rank: " << myRank << " Agent received " << endl;
+						agentsToShift[it->first] = MPIAgent(Agent::Deseriaize(serializedAgent));
+						delete[] serializedAgent;
+					}
+				}
+			}
+
+			cout << "Rank: " << myRank << " Bcasting finish flag: " << endl;
+			destinationNode = -1;
+			MPI_Bcast(&destinationNode, 1, MPI_INT, 0, MPI_COMM_WORLD);  //End of agents shifting requests
+
+			std::set<long long> shiftedAgents;
+			for (std::map<long long, MPIAgent>::iterator it = agentsToShift.begin(); it != agentsToShift.end(); ++it) //Sending agents to destination nodes
+			{
+				long long ID = it->second.ID();
+				float x = it->second.Position().x();
+				float y = it->second.Position().y();
+
+				for(int ar = 0; ar < modelingAreas.size(); ar++)
+				{
+					if(modelingAreas[ar].first.x() <= x && x <= modelingAreas[ar].second.x()
+						&& modelingAreas[ar].first.y() <= y && y <= modelingAreas[ar].second.y())
+					{
+						int nodeID = ar + 1;
+						MPI_Bcast(&nodeID, 1, MPI_INT, 0, MPI_COMM_WORLD); //Bcasing index of target node who should receive new agents
+						cout << "Rank: " << myRank << " Bcasting destination node: " << nodeID << endl;
+
+						unsigned char* serializedAgent = it->second.SerializeAgent();
+
+						int SerializedAgentSize = 0;
+						memcpy(&SerializedAgentSize, serializedAgent, sizeof(int));
+
+						MPI_Send(&SerializedAgentSize, 1, MPI_INT, nodeID, 0, MPI_COMM_WORLD);
+						cout << "Rank: " << myRank << " sending size: " << SerializedAgentSize << " to: " << nodeID << endl;
+						MPI_Send(serializedAgent, SerializedAgentSize, MPI_UNSIGNED_CHAR, nodeID, 0, MPI_COMM_WORLD);
+						cout << "Rank: " << myRank << " agent sent." << endl;
+
+						long long newAgentId = 0;
+						cout << "Rank: " << myRank << " agent sent." << newAgentId << endl;
+						MPI_Recv(&newAgentId, 1, MPI_UNSIGNED_LONG_LONG, nodeID, 0, MPI_COMM_WORLD, MPI_STATUSES_IGNORE);
+						AgentsIDMap[it->first]._nodeID = nodeID;
+						AgentsIDMap[it->first]._agentID = newAgentId;
+						shiftedAgents.insert(it->first);
+						break;
+					}
+				}
+			}
+
+			cout << "Rank: " << myRank << " Bcasting finish flag: " << endl;
+			destinationNode = -1;
+			MPI_Bcast(&destinationNode, 1, MPI_INT, 0, MPI_COMM_WORLD);  //End of agents shifting requests
+
+			//Deleting agents that succesfully shifted
+			std::map<long long, MPIAgent>::iterator agent_it;
+			for (std::set<long long>::iterator it = shiftedAgents.begin(); it != shiftedAgents.end(); ++it)
+			{
+				 agent_it = agentsToShift.find(*it);
+					if (agent_it != agentsToShift.end())
+					{
+						agentsToShift.erase(agent_it);
+					}
+			}
+
+			if(agentsToShift.size() > 0)//If some of agents were outside of area but no other nodes serve for it
+			{
+				for (std::map<long long, MPIAgent>::iterator it = agentsToShift.begin(); it != agentsToShift.end(); ++it)
+				{
+					AgentsIDMap[it->first].isDeleted = true;
+					AgentsPositions[it->first] = Vector2(INT_MIN, INT_MIN);
+				}
+			}
+
+			//destinationNode = -1;
+			//MPI_Bcast(&destinationNode, 1, MPI_INT, 0, MPI_COMM_WORLD); //End of agents shifting
+			#pragma endregion Agents shifting
+
+			//MPI_Barrier(MPI_COMM_WORLD);
 			agentsPositionsFile << "\"agents\": [" << endl;
 			bool notFirseAgentInSection = false;
 			for (std::map<long long, nodeAgent>::iterator it = AgentsIDMap.begin(); it != AgentsIDMap.end(); ++it)
@@ -500,6 +581,7 @@ else
 				{
 					agentsPositionsFile << "{" << endl;
 					agentsPositionsFile << "\t\"agentID\" : \"" << it->first << "\"," <<endl;
+					agentsPositionsFile << "\t\"agentCurrentNode\" : \"" << AgentsIDMap[it->first]._nodeID << "\"," <<endl;
 					agentsPositionsFile << "\t\"X\" : \"" << AgentsPositions[it->first].x() << "\"," << endl;
 					agentsPositionsFile << "\t\"Y\" : \"" << AgentsPositions[it->first].y() << "\"" << endl;
 					agentsPositionsFile << "}";
@@ -510,6 +592,7 @@ else
 		}
 		else //ON SLAVE NODE
 		{
+			#pragma region RECEIVING VELOCITIES
 			do
 			{
 				MPI_Bcast(&destinationNode, 1, MPI_INT, 0, MPI_COMM_WORLD); //Check if it information about agent on this node
@@ -521,19 +604,18 @@ else
 
 					simulator.setAgentPrefVelocity(agentId, Vector2(xVel, yVel));
 				}
-			} while (destinationNode > 0);			
+			} while (destinationNode > 0);
+			#pragma endregion RECEIVING VELOCITIES
 
-			//Do simulation step
+			#pragma region SIMULATING A STEP
 			simulator.doStep();
+			#pragma endregion SIMULATING A STEP
 
-			MPI_Barrier(MPI_COMM_WORLD);
-			//Sending new positions to main node
-
+			#pragma region SENDING NEW POSITIONS OF AGENTS
 			//Requesting vector with requesting agents IDs
 			int requestedAgentsCount;
 			vector<size_t> requestedAgentsIDs;
 			MPI_Recv(&requestedAgentsCount, 1, MPI_INT, 0, 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
-
 			for(int t  = 0; t < requestedAgentsCount; t++)
 			{
 				int requestedID = 0;
@@ -555,8 +637,64 @@ else
 				MPI_Send(serializedAgent, SerializedAgentSize, MPI_UNSIGNED_CHAR, 0, 0, MPI_COMM_WORLD);
 				delete[] serializedAgent;
 			}
+			#pragma endregion SENDING NEW POSITIONS OF AGENTS
 
-			MPI_Barrier(MPI_COMM_WORLD);
+			#pragma region MOVING AGENTS CROSSED MODELIG AREAS
+			cout << "rank: " << myRank << " receiving agents ID to delete from simulation." << endl;
+			do
+			{
+				MPI_Bcast(&destinationNode, 1, MPI_INT, 0, MPI_COMM_WORLD); //Check if it information about agent on this node
+				cout << "rank: " << myRank << " destination: " << destinationNode << endl;
+				if (destinationNode == myRank)
+				{
+					size_t agentID;
+					MPI_Recv(&agentID, 1, MPI_UNSIGNED_LONG_LONG, 0, 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
+					cout << "rank: " << myRank << " agentID: " << agentID << endl;
+					Agent* agent = simulator.getAgent(agentID);
+
+					MPIAgent mpiTmpAgent(agent);
+					unsigned char* serializedAgent = agent->Serialize();
+
+					int SerializedAgentSize = 0;
+					memcpy(&SerializedAgentSize, serializedAgent, sizeof(int));
+
+					MPI_Send(&SerializedAgentSize, 1, MPI_INT, 0, 0, MPI_COMM_WORLD);
+					cout << "rank: " << myRank << " agent size sended:" << SerializedAgentSize << endl;
+
+					MPI_Send(serializedAgent, SerializedAgentSize, MPI_UNSIGNED_CHAR, 0, 0, MPI_COMM_WORLD);
+					cout << "rank: " << myRank << " agent sent." << endl;
+
+					simulator.deleteAgent(agentID);
+					simulator.setAgentPosition(agentID, Vector2(INT_MIN, INT_MIN));
+					simulator.setAgentPrefVelocity(agentID, Vector2(0, 0));
+					cout << "rank: " << myRank << " agent deleted from simulation" << endl;
+					delete[] serializedAgent;
+				}
+			} while (destinationNode > 0);
+			cout << "rank: " << myRank << " deleting agents from simulation finished" << endl;
+
+			cout << "rank: " << myRank << " receiving agents to add to a simulation " << endl;
+			do
+			{
+				MPI_Bcast(&destinationNode, 1, MPI_INT, 0, MPI_COMM_WORLD); //Check if it information about agent on this node
+				cout << "rank: " << myRank << " destination node: " << destinationNode << endl;
+				if (destinationNode == myRank)
+				{
+					int SerializedAgentSize = 0; 
+					MPI_Recv(&SerializedAgentSize, 1, MPI_INT, 0, 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
+				    
+					unsigned char* buffForReceivingAgent = new unsigned char[SerializedAgentSize];
+					MPI_Recv(buffForReceivingAgent, SerializedAgentSize, MPI_UNSIGNED_CHAR, 0, 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
+					cout << "rank: " << myRank << " agent received." << endl;
+
+					long long newAgentId = simulator.addAgent(Agent::Deseriaize(buffForReceivingAgent));
+					MPI_Send(&newAgentId, 1, MPI_UNSIGNED_LONG_LONG, 0, 0, MPI_COMM_WORLD );
+					cout << "rank: " << myRank << " agent added to simulation. New ID: " << newAgentId << endl;
+					delete[] buffForReceivingAgent;
+				}
+			} while (destinationNode > 0);
+			cout << "rank: " << myRank << " receiving agents to add to a simulation finished" << endl;
+			#pragma endregion MOVING AGENTS CROSSED MODELIG AREAS
 		}
 		
 		if(myRank == 0)
