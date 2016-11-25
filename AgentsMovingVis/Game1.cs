@@ -19,15 +19,17 @@ namespace AgentsMovingVis
         SpriteBatch spriteBatch;
         private List<Iteration> simulationData;
         private List<Obstacle> obstacles;
+        private List<Area> subareas;
 
         //     private List<Obstacle> obstacles;
         double timeFromLastUpdate = 0;
-        double timeToAgentStep = 100;
+        double timeToAgentStep = 300;
         private Vector2 offset;
         private int previousScrollValue;
 
         private Texture2D onePixelTexture;
         private Texture2D agentTexture2D;
+        //private Texture2D agentTexture2DRed;
         private SpriteFont Font;
         private int currentIteration = 0;
         private float zoom = 3f;
@@ -66,6 +68,10 @@ namespace AgentsMovingVis
             json = File.ReadAllText(obstPath);
             obstacles = JsonConvert.DeserializeObject<List<Obstacle>>(json);
 
+            string subareasPath = @"areas.txt";
+            json = File.ReadAllText(subareasPath);
+            subareas = JsonConvert.DeserializeObject<List<Area>>(json);
+
             base.Initialize();
         }
 
@@ -78,6 +84,7 @@ namespace AgentsMovingVis
             // Create a new SpriteBatch, which can be used to draw textures.
             spriteBatch = new SpriteBatch(GraphicsDevice);
             agentTexture2D = Content.Load<Texture2D>("agent");
+            //agentTexture2DRed = Content.Load<Texture2D>("agent");
             Font = Content.Load<SpriteFont>("Arial");
             onePixelTexture = CreateTexture2D(Color.Aquamarine, 1, 1);
 
@@ -159,6 +166,11 @@ namespace AgentsMovingVis
                     offset.X++;
                 }
 
+                if (keyBoardState.IsKeyDown(Keys.Space))
+                {
+                    currentIteration = 0;
+                }
+
                 if (IsSpaceDragModeOn)
                 {
                     //MessagesStack.PutMessage("Dragg mode on", 3);
@@ -207,6 +219,22 @@ namespace AgentsMovingVis
             {
                 GraphicsDevice.Clear(Color.Black);
 
+                ////drawing subareas
+                for (int i = 0; i < subareas.Count; i++)
+                {
+                    float x1 = (subareas[i].x1 * zoom) + offset.X;
+                    float y1 = (subareas[i].y1 * zoom) + offset.Y;
+
+                    float x2 = (subareas[i].x2 * zoom) + offset.X;
+                    float y2 = (subareas[i].y2 * zoom) + offset.Y;
+
+                    DrawLine(spriteBatch, new Vector2(x1, y1), new Vector2(x1, y2), Color.Yellow, 1);
+                    DrawLine(spriteBatch, new Vector2(x1, y2), new Vector2(x2, y2), Color.Yellow, 1);
+                    DrawLine(spriteBatch, new Vector2(x2, y2), new Vector2(x2, y1), Color.Yellow, 1);
+                    DrawLine(spriteBatch, new Vector2(x2, y1), new Vector2(x1, y1), Color.Yellow, 1);
+                }
+
+
                 ////drawing obstacles
                 for (int i = 0; i < obstacles.Count; i++)
                 {
@@ -227,8 +255,32 @@ namespace AgentsMovingVis
                 {
                     float x = simulationData[currentIteration].agents[i].X;
                     float y = simulationData[currentIteration].agents[i].Y;
-                    spriteBatch.Draw(agentTexture2D, new Vector2(offset.X + (x * zoom), offset.Y + (y * zoom)), null, Color.White, 0.0f, new Vector2(0, 0), new Vector2(0.05f, 0.05f), SpriteEffects.None, 0);
+                    if (i < simulationData[currentIteration].agents.Count/2)
+                    {
+                        spriteBatch.Draw(agentTexture2D, new Vector2(offset.X + (x * zoom) - (agentTexture2D.Width * 0.03f / 2), offset.Y + (y * zoom) - (agentTexture2D.Height * 0.03f / 2)), null, Color.White, 0.0f, new Vector2(0, 0), new Vector2(0.03f, 0.03f), SpriteEffects.None, 0);
+                    }
+                    else
+                    {
+                        spriteBatch.Draw(agentTexture2D, new Vector2(offset.X + (x * zoom) - (agentTexture2D.Width * 0.03f / 2), offset.Y + (y * zoom) - (agentTexture2D.Height * 0.03f / 2)), null, Color.Red, 0.0f, new Vector2(0, 0), new Vector2(0.03f, 0.03f), SpriteEffects.None, 0);
+                    }
+                   
                 }
+
+                //drawing trace
+                for (int i = 0; i < simulationData[currentIteration].agents.Count; i++)
+                {
+                    float x1 = simulationData[currentIteration].agents[i].X;
+                    float y1 = simulationData[currentIteration].agents[i].Y;
+
+                    if (currentIteration > 0)
+                    {
+                        float x2 = simulationData[currentIteration - 1].agents[i].X;
+                        float y2 = simulationData[currentIteration - 1].agents[i].Y;
+
+                        DrawLine(spriteBatch, new Vector2(offset.X + (x1 * zoom), offset.Y + (y1 * zoom)), new Vector2(offset.X + (x2 * zoom), offset.Y + (y2 * zoom)), Color.Green, 1);
+                    }
+                }
+
 
                 spriteBatch.DrawString(Font, "zoom: " + zoom.ToString(), new Vector2(50, 50), Color.Red, 0f, Vector2.Zero, new Vector2(1, 1), SpriteEffects.None, 0);
                 spriteBatch.DrawString(Font, "Iteration: " + currentIteration.ToString(), new Vector2(50, 100), Color.Red, 0f, Vector2.Zero, new Vector2(1, 1), SpriteEffects.None, 0);
