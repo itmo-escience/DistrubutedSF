@@ -8,6 +8,8 @@ namespace AgentsMovingVis
 {
     class Area
     {
+        public float verticalIndent { get; set; }
+        public float horizontalIndent { get; set; }
         public int x1 { get; set; }
         public int y1 { get; set; }
         public int x2 { get; set; }

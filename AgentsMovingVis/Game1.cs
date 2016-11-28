@@ -111,7 +111,8 @@ namespace AgentsMovingVis
         {
             try
             {
-                if (GamePad.GetState(PlayerIndex.One).Buttons.Back == ButtonState.Pressed || Keyboard.GetState().IsKeyDown(Keys.Escape))
+                if (GamePad.GetState(PlayerIndex.One).Buttons.Back == ButtonState.Pressed ||
+                    Keyboard.GetState().IsKeyDown(Keys.Escape))
                     Exit();
 
                 var mouseState = Mouse.GetState();
@@ -171,6 +172,22 @@ namespace AgentsMovingVis
                     currentIteration = 0;
                 }
 
+                if (keyBoardState.IsKeyDown(Keys.OemMinus))
+                {
+                    if (currentIteration > 0)
+                    {
+                        currentIteration--;
+                    }
+                }
+
+                if (keyBoardState.IsKeyDown(Keys.OemPlus))
+                {
+                    if (currentIteration < simulationData.Count - 1)
+                    {
+                        currentIteration++;
+                    }
+                }
+
                 if (IsSpaceDragModeOn)
                 {
                     //MessagesStack.PutMessage("Dragg mode on", 3);
@@ -188,7 +205,7 @@ namespace AgentsMovingVis
 
                 if (timeFromLastUpdate >= timeToAgentStep) //timeConstraint
                 {
-                    if (currentIteration < simulationData.Count)
+                    if (currentIteration < simulationData.Count - 1)
                     {
                         currentIteration++;
                     }
@@ -215,47 +232,84 @@ namespace AgentsMovingVis
         {
 
             spriteBatch.Begin();
+            //try
+            //{
+            GraphicsDevice.Clear(Color.Black);
+
             try
             {
-                GraphicsDevice.Clear(Color.Black);
-
                 ////drawing subareas
                 for (int i = 0; i < subareas.Count; i++)
                 {
-                    float x1 = (subareas[i].x1 * zoom) + offset.X;
-                    float y1 = (subareas[i].y1 * zoom) + offset.Y;
+                    float x1 = (subareas[i].x1*zoom) + offset.X;
+                    float y1 = (subareas[i].y1*zoom) + offset.Y;
+                    float x1_ = ((subareas[i].x1 + subareas[i].horizontalIndent)*zoom) + offset.X;
+                    float y1_ = ((subareas[i].y1 + subareas[i].verticalIndent)*zoom) + offset.Y;
 
-                    float x2 = (subareas[i].x2 * zoom) + offset.X;
-                    float y2 = (subareas[i].y2 * zoom) + offset.Y;
+                    float x2 = (subareas[i].x2*zoom) + offset.X;
+                    float y2 = (subareas[i].y2*zoom) + offset.Y;
+                    float x2_ = ((subareas[i].x2 - subareas[i].horizontalIndent)*zoom) + offset.X;
+                    float y2_ = ((subareas[i].y2 - subareas[i].verticalIndent)*zoom) + offset.Y;
+
+                    Rectangle RectForBorders = new Rectangle((int) x1, (int) y1, (int) (x2 - x1), (int) (y2 - y1));
+                    spriteBatch.Draw(onePixelTexture, RectForBorders, null, Color.Azure);
+
+                    Rectangle centralRect = new Rectangle((int) x1_, (int) y1_, (int) (x2_ - x1_), (int) (y2_ - y1_));
+                    spriteBatch.Draw(onePixelTexture, centralRect, null, Color.Black);
 
                     DrawLine(spriteBatch, new Vector2(x1, y1), new Vector2(x1, y2), Color.Yellow, 1);
                     DrawLine(spriteBatch, new Vector2(x1, y2), new Vector2(x2, y2), Color.Yellow, 1);
                     DrawLine(spriteBatch, new Vector2(x2, y2), new Vector2(x2, y1), Color.Yellow, 1);
                     DrawLine(spriteBatch, new Vector2(x2, y1), new Vector2(x1, y1), Color.Yellow, 1);
                 }
+            }
+            catch (Exception ex)
+            {
+                File.WriteAllText("Error.txt", ex.ToString());
+            }
 
 
+            try
+            {
                 ////drawing obstacles
                 for (int i = 0; i < obstacles.Count; i++)
                 {
                     for (int j = 0; j < obstacles[i].points.Count - 1; j++)
                     {
-                        float x1 = (obstacles[i].points[j].X * zoom) + offset.X;
-                        float y1 = (obstacles[i].points[j].Y * zoom) + offset.Y;
+                        float x1 = (obstacles[i].points[j].X*zoom) + offset.X;
+                        float y1 = (obstacles[i].points[j].Y*zoom) + offset.Y;
 
-                        float x2 = (obstacles[i].points[j + 1].X * zoom) + offset.X;
-                        float y2 = (obstacles[i].points[j + 1].Y * zoom) + offset.Y;
+                        float x2 = (obstacles[i].points[j + 1].X*zoom) + offset.X;
+                        float y2 = (obstacles[i].points[j + 1].Y*zoom) + offset.Y;
 
                         DrawLine(spriteBatch, new Vector2(x1, y1), new Vector2(x2, y2), Color.Blue, 2);
                     }
                 }
+            }
+            catch (Exception ex)
+            {
+                File.WriteAllText("Error.txt", ex.ToString());
+            }
 
+
+            try
+            {
                 //drawing agents
                 for (int i = 0; i < simulationData[currentIteration].agents.Count; i++)
                 {
-                    float x = simulationData[currentIteration].agents[i].X;
-                    float y = simulationData[currentIteration].agents[i].Y;
-                    if (i < simulationData[currentIteration].agents.Count/2)
+                    float x = 0;
+                    float y = 0;
+                    try
+                    {
+                        x = simulationData[currentIteration].agents[i].X;
+                        y = simulationData[currentIteration].agents[i].Y;
+                    }
+                    catch (Exception)
+                    {
+                        throw;
+                    }
+
+                    if (i < simulationData[currentIteration].agents.Count / 2)
                     {
                         spriteBatch.Draw(agentTexture2D, new Vector2(offset.X + (x * zoom) - (agentTexture2D.Width * 0.03f / 2), offset.Y + (y * zoom) - (agentTexture2D.Height * 0.03f / 2)), null, Color.White, 0.0f, new Vector2(0, 0), new Vector2(0.03f, 0.03f), SpriteEffects.None, 0);
                     }
@@ -263,9 +317,15 @@ namespace AgentsMovingVis
                     {
                         spriteBatch.Draw(agentTexture2D, new Vector2(offset.X + (x * zoom) - (agentTexture2D.Width * 0.03f / 2), offset.Y + (y * zoom) - (agentTexture2D.Height * 0.03f / 2)), null, Color.Red, 0.0f, new Vector2(0, 0), new Vector2(0.03f, 0.03f), SpriteEffects.None, 0);
                     }
-                   
                 }
+            }
+            catch (Exception ex)
+            {
+                File.WriteAllText("Error.txt", ex.ToString());
+            }
 
+            try
+            {
                 //drawing trace
                 for (int i = 0; i < simulationData[currentIteration].agents.Count; i++)
                 {
@@ -289,6 +349,12 @@ namespace AgentsMovingVis
             {
                 File.WriteAllText("Error.txt", ex.ToString());
             }
+
+            //}
+            //catch (Exception ex)
+            //{
+            //    File.WriteAllText("Error.txt", ex.ToString());
+            //}
             spriteBatch.End();
             base.Draw(gameTime);
         }
