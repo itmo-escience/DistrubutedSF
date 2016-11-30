@@ -5,7 +5,7 @@
 #include <time.h>       /* time */
 #include <iostream>
 #include <fstream>
-#include "../social-phys-lib-private/SF/MPIAgent.h"
+#include "../social-phys-lib-private/SF/include/MPIAgent.h"
 #include <set>
 
 using namespace std;
