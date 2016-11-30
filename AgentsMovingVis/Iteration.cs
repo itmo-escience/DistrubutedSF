@@ -8,7 +8,7 @@ namespace AgentsMovingVis
 {
     class Iteration
     {
-        public string iteration { get; set; }
+        public int iteration { get; set; }
         public List<Agent> agents { get; set; }
     }
 }

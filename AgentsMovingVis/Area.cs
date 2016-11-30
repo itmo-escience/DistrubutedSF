@@ -10,9 +10,9 @@ namespace AgentsMovingVis
     {
         public float verticalIndent { get; set; }
         public float horizontalIndent { get; set; }
-        public int x1 { get; set; }
-        public int y1 { get; set; }
-        public int x2 { get; set; }
-        public int y2 { get; set; }
+        public float x1 { get; set; }
+        public float y1 { get; set; }
+        public float x2 { get; set; }
+        public float y2 { get; set; }
     }
 }

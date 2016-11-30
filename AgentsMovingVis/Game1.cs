@@ -18,6 +18,7 @@ namespace AgentsMovingVis
         GraphicsDeviceManager graphics;
         SpriteBatch spriteBatch;
         private List<Iteration> simulationData;
+        private Dictionary<int, Dictionary<long, Agent>> simDataDictionary;
         private List<Obstacle> obstacles;
         private List<Area> subareas;
 
@@ -32,7 +33,9 @@ namespace AgentsMovingVis
         //private Texture2D agentTexture2DRed;
         private SpriteFont Font;
         private int currentIteration = 0;
+        private bool IsPause = false;
         private float zoom = 3f;
+        KeyboardState oldState;
 
         private bool IsSpaceDragModeOn;
         private Point previousMouseLBPressedPoint;
@@ -63,6 +66,17 @@ namespace AgentsMovingVis
             json = File.ReadAllText(simDataPath);
             simulationData = JsonConvert.DeserializeObject<List<Iteration>>(json);
 
+            simDataDictionary = new Dictionary<int, Dictionary<long, Agent>>();
+            for (int i = 0; i < simulationData.Count; i++)
+            {
+                Dictionary<long, Agent> agentsOnIteration = new Dictionary<long, Agent>();
+                for (int j = 0; j < simulationData[i].agents.Count; j++)
+                {
+                    agentsOnIteration[simulationData[i].agents[j].agentID] = simulationData[i].agents[j];
+                }
+                simDataDictionary[simulationData[i].iteration] = agentsOnIteration;
+            }
+
 
             string obstPath = @"Obstacles.txt";
             json = File.ReadAllText(obstPath);
@@ -71,6 +85,8 @@ namespace AgentsMovingVis
             string subareasPath = @"areas.txt";
             json = File.ReadAllText(subareasPath);
             subareas = JsonConvert.DeserializeObject<List<Area>>(json);
+
+            oldState = Keyboard.GetState();
 
             base.Initialize();
         }
@@ -172,7 +188,17 @@ namespace AgentsMovingVis
                     currentIteration = 0;
                 }
 
-                if (keyBoardState.IsKeyDown(Keys.OemMinus))
+                if (keyBoardState.IsKeyDown(Keys.P))
+                {
+                    IsPause = true;
+                }
+
+                if (keyBoardState.IsKeyUp(Keys.P))
+                {
+                    IsPause = false;
+                }
+
+                if (keyBoardState.IsKeyDown(Keys.OemMinus) && !oldState.IsKeyDown(Keys.OemMinus))
                 {
                     if (currentIteration > 0)
                     {
@@ -180,7 +206,7 @@ namespace AgentsMovingVis
                     }
                 }
 
-                if (keyBoardState.IsKeyDown(Keys.OemPlus))
+                if (keyBoardState.IsKeyDown(Keys.OemPlus) && !oldState.IsKeyDown(Keys.OemPlus))
                 {
                     if (currentIteration < simulationData.Count - 1)
                     {
@@ -205,13 +231,17 @@ namespace AgentsMovingVis
 
                 if (timeFromLastUpdate >= timeToAgentStep) //timeConstraint
                 {
-                    if (currentIteration < simulationData.Count - 1)
+                    if (currentIteration < simulationData.Count - 1 && !IsPause)
                     {
                         currentIteration++;
                     }
 
                     timeFromLastUpdate = 0;
                 }
+
+
+                // Update saved state.
+                oldState = keyBoardState;
 
 
                 // TODO: Add your update logic here
@@ -309,7 +339,7 @@ namespace AgentsMovingVis
                         throw;
                     }
 
-                    if (i < simulationData[currentIteration].agents.Count / 2)
+                    if (i <  1000 /*simulationData[currentIteration].agents.Count / 2*/)
                     {
                         spriteBatch.Draw(agentTexture2D, new Vector2(offset.X + (x * zoom) - (agentTexture2D.Width * 0.03f / 2), offset.Y + (y * zoom) - (agentTexture2D.Height * 0.03f / 2)), null, Color.White, 0.0f, new Vector2(0, 0), new Vector2(0.03f, 0.03f), SpriteEffects.None, 0);
                     }
@@ -334,13 +364,12 @@ namespace AgentsMovingVis
 
                     if (currentIteration > 0)
                     {
-                        float x2 = simulationData[currentIteration - 1].agents[i].X;
-                        float y2 = simulationData[currentIteration - 1].agents[i].Y;
+                        float x2 = simDataDictionary[currentIteration - 1][simulationData[currentIteration].agents[i].agentID].X; // simulationData[currentIteration - 1].agents[i].X;
+                        float y2 = simDataDictionary[currentIteration - 1][simulationData[currentIteration].agents[i].agentID].Y; //simulationData[currentIteration - 1].agents[i].Y;
 
                         DrawLine(spriteBatch, new Vector2(offset.X + (x1 * zoom), offset.Y + (y1 * zoom)), new Vector2(offset.X + (x2 * zoom), offset.Y + (y2 * zoom)), Color.Green, 1);
                     }
                 }
-
 
                 spriteBatch.DrawString(Font, "zoom: " + zoom.ToString(), new Vector2(50, 50), Color.Red, 0f, Vector2.Zero, new Vector2(1, 1), SpriteEffects.None, 0);
                 spriteBatch.DrawString(Font, "Iteration: " + currentIteration.ToString(), new Vector2(50, 100), Color.Red, 0f, Vector2.Zero, new Vector2(1, 1), SpriteEffects.None, 0);
