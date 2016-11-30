@@ -67,13 +67,13 @@ int main(int argc, char* argv[])
 			15.f, 	//	NeighborDist = 15f,
 			15, 	//	MaxNeighbors = 10,
 			5.f, 	//	TimeHorizon = 5f,
-			0.1f,	//	Radius = 0.2f,
+			0.2f,	//	Radius = 0.2f,
 			2.0f,	//	MaxSpeed = 2.0f,
-			0.f, 	//	float force,
-			0.5f,	//	float accelerationCoefficient,
+			0.0f, 	//	float force, was 0
+ 			0.5f,	//	float accelerationCoefficient,
 			1.f, 	//	float relaxationTime,
-			0.22f,	//	float repulsiveAgent, was 1.2
-			10, 	//	float repulsiveAgentFactor, was 70
+			0.42f,	//	float repulsiveAgent, was 1.2
+			70, 	//	float repulsiveAgentFactor, was 70
 			0.1f, 	//	float repulsiveObstacle,
 			0.3f, 	//	float repulsiveObstacleFactor,
 			0.0f, 	//	float obstacleRadius,
@@ -256,9 +256,9 @@ else
 				bool IsPOintAdded = false;
 				for(int a = 0; a < modelingAreas.size(); a++) //Choosing nodes
 				{
-					if(agentsPositions[i].x() >= modelingAreas[a].first.x() && agentsPositions[i].x() <= modelingAreas[a].second.x())
+					if(agentsPositions[i].x() >= modelingAreas[a].first.x() && agentsPositions[i].x() < modelingAreas[a].second.x())
 					{
-						if(agentsPositions[i].y() >= modelingAreas[a].first.y() && agentsPositions[i].y() <= modelingAreas[a].second.y())
+						if(agentsPositions[i].y() >= modelingAreas[a].first.y() && agentsPositions[i].y() < modelingAreas[a].second.y())
 						{
 							destinationNode = a + 1;
 							MPI_Bcast(&destinationNode, 1, MPI_INT, 0, MPI_COMM_WORLD);
@@ -303,6 +303,7 @@ else
 					MPI_Recv(&x, 1, MPI_FLOAT, 0, 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
 					MPI_Recv(&y, 1, MPI_FLOAT, 0, 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
 					//cout << "rank: " << myRank << " Position " << x << ":" << y << " received." << endl;
+					//if(x < )
 					size_t agentID = simulator.addAgent(Vector2(x, y));
 					//cout << "rank: " << myRank << " new agend added to simulator. ID: " << agentID << endl;
 					MPI_Send(&agentID, 1, MPI_INT, 0, 0, MPI_COMM_WORLD); //Sending back new agent ID
@@ -382,7 +383,7 @@ else
 			{
 				agentId = it->second._agentID;
 				destinationNode = it->second._nodeID;
-				if (it->first < agentsCount / 2) //Agents from zone A
+				if (it->first < 1000 /*agentsCount / 2*/) //Agents from zone A
 				{
 					if (AgentsPositions[it->first].x() <= 190)
 					{
@@ -433,145 +434,326 @@ else
 					float y = AgentsPositions[it->first].y();
 					//cout << "agent pos x: " << x << " y: " << y << endl;
 
+					#pragma region left side
 					if( x <= modelingAreas[it->second._nodeID - 1].first.x() + minimalWidth) // left side adjacent area
 					{
 						for(int i = 0; i < modelingAreas.size(); i++)
 						{
-							if(modelingAreas[i].first.y() == modelingAreas[it->second._nodeID - 1].first.y() //if common side
-							&& modelingAreas[i].second.x() == modelingAreas[it->second._nodeID - 1].first.x())
+							if (it->second._nodeID != i + 1)
 							{
-								//cout << "agent at position x: " << x << " " << y << " is in area x: " << modelingAreas[it->second._nodeID - 1].first.x() << " " << modelingAreas[it->second._nodeID - 1].first.y() << " " << modelingAreas[it->second._nodeID - 1].second.x() << " " << modelingAreas[it->second._nodeID - 1].second.y() << " and adjacent by left side" << endl;
-								//request agent
-								destinationNode = it->second._nodeID;
-								MPI_Bcast(&destinationNode, 1, MPI_INT, 0, MPI_COMM_WORLD);
-								long long nodeAgentId = it->second._agentID;
-								MPI_Send(&nodeAgentId, 1, MPI_UNSIGNED_LONG_LONG, it->second._nodeID , 0, MPI_COMM_WORLD);
-								//cout << "Agent ID to request phantom: " << nodeAgentId << endl; 
-								//receiving agent
-								int SerializedAgentSize = 0;
-								MPI_Recv(&SerializedAgentSize, 1, MPI_INT, it->second._nodeID, 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
-								//cout << "agert size received" << endl;
-								unsigned char* serializedAgent = new unsigned char[SerializedAgentSize];
-								MPI_Recv(serializedAgent, SerializedAgentSize, MPI_UNSIGNED_CHAR, it->second._nodeID, 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
-								//cout << "Agent received" << endl;
+								if(modelingAreas[i].second.y() == modelingAreas[it->second._nodeID - 1].second.y()//if common side
+								&& modelingAreas[i].first.y() == modelingAreas[it->second._nodeID - 1].first.y()
+								&& modelingAreas[i].second.x() == modelingAreas[it->second._nodeID - 1].first.x())
+								{
+									//cout << "agent at position x: " << x << " " << y << " is in area x: " << modelingAreas[it->second._nodeID - 1].first.x() << " " << modelingAreas[it->second._nodeID - 1].first.y() << " " << modelingAreas[it->second._nodeID - 1].second.x() << " " << modelingAreas[it->second._nodeID - 1].second.y() << " and adjacent by left side" << endl;
+									//request agent
+									destinationNode = it->second._nodeID;
+									MPI_Bcast(&destinationNode, 1, MPI_INT, 0, MPI_COMM_WORLD);
+									long long nodeAgentId = it->second._agentID;
+									MPI_Send(&nodeAgentId, 1, MPI_UNSIGNED_LONG_LONG, it->second._nodeID , 0, MPI_COMM_WORLD);
+									//cout << "Agent ID to request phantom: " << nodeAgentId << endl; 
+									//receiving agent
+									int SerializedAgentSize = 0;
+									MPI_Recv(&SerializedAgentSize, 1, MPI_INT, it->second._nodeID, 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
+									//cout << "agert size received" << endl;
+									unsigned char* serializedAgent = new unsigned char[SerializedAgentSize];
+									MPI_Recv(serializedAgent, SerializedAgentSize, MPI_UNSIGNED_CHAR, it->second._nodeID, 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
+									//cout << "Agent received" << endl;
 
-								//send agent to create phantom
-								destinationNode = i + 1;
-								MPI_Bcast(&destinationNode, 1, MPI_INT, 0, MPI_COMM_WORLD);
-								//cout << "Bcasted destination node" << endl;
-								//sending agent
-								MPI_Send(&SerializedAgentSize, 1, MPI_INT, destinationNode, 0, MPI_COMM_WORLD);
-								MPI_Send(serializedAgent, SerializedAgentSize, MPI_UNSIGNED_CHAR, destinationNode, 0, MPI_COMM_WORLD);
-								delete[] serializedAgent;
-								break;
+									//send agent to create phantom
+									destinationNode = i + 1;
+									MPI_Bcast(&destinationNode, 1, MPI_INT, 0, MPI_COMM_WORLD);
+									//cout << "Bcasted destination node" << endl;
+									//sending agent
+									MPI_Send(&SerializedAgentSize, 1, MPI_INT, destinationNode, 0, MPI_COMM_WORLD);
+									MPI_Send(serializedAgent, SerializedAgentSize, MPI_UNSIGNED_CHAR, destinationNode, 0, MPI_COMM_WORLD);
+									delete[] serializedAgent;
+								}
 							}
 						}
 					}
+					#pragma endregion left side
 
+					#pragma region right side
 					if(x >= modelingAreas[it->second._nodeID - 1].second.x() - minimalWidth) // right side adjacent area
 					{
 						for(int i = 0; i < modelingAreas.size(); i++)
 						{
-							if(modelingAreas[it->second._nodeID - 1].first.y() == modelingAreas[i].first.y()//if common side
-							&& modelingAreas[it->second._nodeID - 1].second.x() == modelingAreas[i].second.x())
+							if (it->second._nodeID != i + 1)
 							{
-								//cout << "agent at position x: " << x << " " << y << " is in area x: " << modelingAreas[it->second._nodeID - 1].first.x() << " " << modelingAreas[it->second._nodeID - 1].first.y() << " " << modelingAreas[it->second._nodeID - 1].second.x() << " " << modelingAreas[it->second._nodeID - 1].second.y() << " and adjacent by right side" << endl;
-								//request agent
-								destinationNode = it->second._nodeID;
-								MPI_Bcast(&destinationNode, 1, MPI_INT, 0, MPI_COMM_WORLD);
-								long long nodeAgentId = it->second._agentID;
-								MPI_Send(&nodeAgentId, 1, MPI_UNSIGNED_LONG_LONG, it->second._nodeID ,0, MPI_COMM_WORLD);
-								//cout << "Agent ID to request phantom: " << nodeAgentId << endl; 
-								//receiving agent
-								int SerializedAgentSize = 0;
-								MPI_Recv(&SerializedAgentSize, 1, MPI_INT, it->second._nodeID, 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
-								//cout << "agert size received" << endl;
-								unsigned char* serializedAgent = new unsigned char[SerializedAgentSize];
-								MPI_Recv(serializedAgent, SerializedAgentSize, MPI_UNSIGNED_CHAR, it->second._nodeID, 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
-								//cout << "Agent received" << endl;
+								if(modelingAreas[it->second._nodeID - 1].second.y() == modelingAreas[i].second.y()//if common side
+								&& modelingAreas[it->second._nodeID - 1].second.x() == modelingAreas[i].first.x()
+								&& modelingAreas[it->second._nodeID - 1].first.y() == modelingAreas[i].first.y())
+								{
+									//cout << "agent at position x: " << x << " " << y << " is in area x: " << modelingAreas[it->second._nodeID - 1].first.x() << " " << modelingAreas[it->second._nodeID - 1].first.y() << " " << modelingAreas[it->second._nodeID - 1].second.x() << " " << modelingAreas[it->second._nodeID - 1].second.y() << " and adjacent by right side" << endl;
+									//request agent
+									destinationNode = it->second._nodeID;
+									MPI_Bcast(&destinationNode, 1, MPI_INT, 0, MPI_COMM_WORLD);
+									long long nodeAgentId = it->second._agentID;
+									MPI_Send(&nodeAgentId, 1, MPI_UNSIGNED_LONG_LONG, it->second._nodeID ,0, MPI_COMM_WORLD);
+									//cout << "Agent ID to request phantom: " << nodeAgentId << endl; 
+									//receiving agent
+									int SerializedAgentSize = 0;
+									MPI_Recv(&SerializedAgentSize, 1, MPI_INT, it->second._nodeID, 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
+									//cout << "agert size received" << endl;
+									unsigned char* serializedAgent = new unsigned char[SerializedAgentSize];
+									MPI_Recv(serializedAgent, SerializedAgentSize, MPI_UNSIGNED_CHAR, it->second._nodeID, 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
+									//cout << "Agent received" << endl;
 
-								//send agent to create phantom
-								destinationNode = i + 1;
-								MPI_Bcast(&destinationNode, 1, MPI_INT, 0, MPI_COMM_WORLD);
-								//cout << "Bcasted destination node" << endl;
-								//sending agent
-								MPI_Send(&SerializedAgentSize, 1, MPI_INT, destinationNode, 0, MPI_COMM_WORLD);
-								MPI_Send(serializedAgent, SerializedAgentSize, MPI_UNSIGNED_CHAR, destinationNode, 0, MPI_COMM_WORLD);
-								delete[] serializedAgent;
-								break;
+									//send agent to create phantom
+									destinationNode = i + 1;
+									MPI_Bcast(&destinationNode, 1, MPI_INT, 0, MPI_COMM_WORLD);
+									//cout << "Bcasted destination node" << endl;
+									//sending agent
+									MPI_Send(&SerializedAgentSize, 1, MPI_INT, destinationNode, 0, MPI_COMM_WORLD);
+									MPI_Send(serializedAgent, SerializedAgentSize, MPI_UNSIGNED_CHAR, destinationNode, 0, MPI_COMM_WORLD);
+									delete[] serializedAgent;
+								}
 							}
 						}
 					}
+					#pragma endregion right side
 
+					#pragma region bottom side
 					if(y <= modelingAreas[it->second._nodeID - 1].first.y() + minimalHeight) // bottom side adjacent area
 					{
 						for(int i = 0; i < modelingAreas.size(); i++)
 						{
-							if(modelingAreas[it->second._nodeID - 1].first.y() == modelingAreas[i].second.y()//if common side
-							&& modelingAreas[it->second._nodeID - 1].first.x() == modelingAreas[i].first.x())
+							if (it->second._nodeID != i + 1)
 							{
-								//cout << "agent at position x: " << x << " " << y << " is in area x: " << modelingAreas[it->second._nodeID - 1].first.x() << " " << modelingAreas[it->second._nodeID - 1].first.y() << " " << modelingAreas[it->second._nodeID - 1].second.x() << " " << modelingAreas[it->second._nodeID - 1].second.y() << " and adjacent by bottom side" << endl;
-								//request agent
-								destinationNode = it->second._nodeID;
-								MPI_Bcast(&destinationNode, 1, MPI_INT, 0, MPI_COMM_WORLD);
-								long long nodeAgentId = it->second._agentID;
-								MPI_Send(&nodeAgentId, 1, MPI_UNSIGNED_LONG_LONG, it->second._nodeID ,0, MPI_COMM_WORLD);
-								//cout << "Agent ID to request phantom: " << nodeAgentId << endl; 
-								//receiving agent
-								int SerializedAgentSize = 0;
-								MPI_Recv(&SerializedAgentSize, 1, MPI_INT, it->second._nodeID, 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
-								//cout << "agert size received" << endl;
-								unsigned char* serializedAgent = new unsigned char[SerializedAgentSize];
-								MPI_Recv(serializedAgent, SerializedAgentSize, MPI_UNSIGNED_CHAR, it->second._nodeID, 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
-								//cout << "Agent received" << endl;
+								if(modelingAreas[it->second._nodeID - 1].first.x() == modelingAreas[i].first.x()//if common side
+								&& modelingAreas[it->second._nodeID - 1].first.y() == modelingAreas[i].second.y()
+								&& modelingAreas[it->second._nodeID - 1].second.x() == modelingAreas[i].second.x())
+								{
+									//cout << "agent at position x: " << x << " " << y << " is in area x: " << modelingAreas[it->second._nodeID - 1].first.x() << " " << modelingAreas[it->second._nodeID - 1].first.y() << " " << modelingAreas[it->second._nodeID - 1].second.x() << " " << modelingAreas[it->second._nodeID - 1].second.y() << " and adjacent by bottom side" << endl;
+									//request agent
+									destinationNode = it->second._nodeID;
+									MPI_Bcast(&destinationNode, 1, MPI_INT, 0, MPI_COMM_WORLD);
+									long long nodeAgentId = it->second._agentID;
+									MPI_Send(&nodeAgentId, 1, MPI_UNSIGNED_LONG_LONG, it->second._nodeID ,0, MPI_COMM_WORLD);
+									//cout << "Agent ID to request phantom: " << nodeAgentId << endl; 
+									//receiving agent
+									int SerializedAgentSize = 0;
+									MPI_Recv(&SerializedAgentSize, 1, MPI_INT, it->second._nodeID, 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
+									//cout << "agert size received" << endl;
+									unsigned char* serializedAgent = new unsigned char[SerializedAgentSize];
+									MPI_Recv(serializedAgent, SerializedAgentSize, MPI_UNSIGNED_CHAR, it->second._nodeID, 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
+									//cout << "Agent received" << endl;
 
-								//send agent to create phantom
-								destinationNode = i + 1;
-								MPI_Bcast(&destinationNode, 1, MPI_INT, 0, MPI_COMM_WORLD);
-								//cout << "Bcasted destination node" << endl;
-								//sending agent
-								MPI_Send(&SerializedAgentSize, 1, MPI_INT, destinationNode, 0, MPI_COMM_WORLD);
-								MPI_Send(serializedAgent, SerializedAgentSize, MPI_UNSIGNED_CHAR, destinationNode, 0, MPI_COMM_WORLD);
-								delete[] serializedAgent;
-								break;
+									//send agent to create phantom
+									destinationNode = i + 1;
+									MPI_Bcast(&destinationNode, 1, MPI_INT, 0, MPI_COMM_WORLD);
+									//cout << "Bcasted destination node" << endl;
+									//sending agent
+									MPI_Send(&SerializedAgentSize, 1, MPI_INT, destinationNode, 0, MPI_COMM_WORLD);
+									MPI_Send(serializedAgent, SerializedAgentSize, MPI_UNSIGNED_CHAR, destinationNode, 0, MPI_COMM_WORLD);
+									delete[] serializedAgent;
+								}
 							}
 						}
 					}
+					#pragma endregion bottom side
 
+					#pragma region top side
 					if(y >= modelingAreas[it->second._nodeID - 1].second.y() - minimalHeight) // top side adjacent area
 					{
 						for(int i = 0; i < modelingAreas.size(); i++)
 						{
-							if(modelingAreas[it->second._nodeID - 1].second.y() == modelingAreas[i].first.y()//if common side
-							&& modelingAreas[it->second._nodeID - 1].first.x() == modelingAreas[i].first.x())
+							if (it->second._nodeID != i + 1)
 							{
-								//cout << "agent at position x: " << x << " " << y << " is in area x: " << modelingAreas[it->second._nodeID - 1].first.x() << " " << modelingAreas[it->second._nodeID - 1].first.y() << " " << modelingAreas[it->second._nodeID - 1].second.x() << " " << modelingAreas[it->second._nodeID - 1].second.y() << " and adjacent by top side" << endl;
-								//request agent
-								destinationNode = it->second._nodeID;
-								MPI_Bcast(&destinationNode, 1, MPI_INT, 0, MPI_COMM_WORLD);
-								long long nodeAgentId = it->second._agentID;
-								MPI_Send(&nodeAgentId, 1, MPI_UNSIGNED_LONG_LONG, it->second._nodeID , 0, MPI_COMM_WORLD);
-								//cout << "Agent ID to request phantom: " << nodeAgentId << endl; 
-								//receiving agent
-								int SerializedAgentSize = 0;
-								MPI_Recv(&SerializedAgentSize, 1, MPI_INT, it->second._nodeID, 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
-								//cout << "agert size received" << endl;
-								unsigned char* serializedAgent = new unsigned char[SerializedAgentSize];
-								MPI_Recv(serializedAgent, SerializedAgentSize, MPI_UNSIGNED_CHAR, it->second._nodeID, 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
-								//cout << "Agent received" << endl;
+								if(modelingAreas[i].first.x() == modelingAreas[it->second._nodeID - 1].first.x()//if common side
+								&& modelingAreas[i].first.y() == modelingAreas[it->second._nodeID - 1].second.y()
+								&& modelingAreas[i].second.x() == modelingAreas[it->second._nodeID - 1].second.x())
+								{
+									//cout << "agent at position x: " << x << " " << y << " is in area x: " << modelingAreas[it->second._nodeID - 1].first.x() << " " << modelingAreas[it->second._nodeID - 1].first.y() << " " << modelingAreas[it->second._nodeID - 1].second.x() << " " << modelingAreas[it->second._nodeID - 1].second.y() << " and adjacent by top side" << endl;
+									//request agent
+									destinationNode = it->second._nodeID;
+									MPI_Bcast(&destinationNode, 1, MPI_INT, 0, MPI_COMM_WORLD);
+									long long nodeAgentId = it->second._agentID;
+									MPI_Send(&nodeAgentId, 1, MPI_UNSIGNED_LONG_LONG, it->second._nodeID , 0, MPI_COMM_WORLD);
+									//cout << "Agent ID to request phantom: " << nodeAgentId << endl; 
+									//receiving agent
+									int SerializedAgentSize = 0;
+									MPI_Recv(&SerializedAgentSize, 1, MPI_INT, it->second._nodeID, 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
+									//cout << "agert size received" << endl;
+									unsigned char* serializedAgent = new unsigned char[SerializedAgentSize];
+									MPI_Recv(serializedAgent, SerializedAgentSize, MPI_UNSIGNED_CHAR, it->second._nodeID, 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
+									//cout << "Agent received" << endl;
 
-								//send agent to create phantom
-								destinationNode = i + 1;
-								MPI_Bcast(&destinationNode, 1, MPI_INT, 0, MPI_COMM_WORLD);
-								//cout << "Bcasted destination node" << endl;
-								//sending agent
-								MPI_Send(&SerializedAgentSize, 1, MPI_INT, destinationNode, 0, MPI_COMM_WORLD);
-								MPI_Send(serializedAgent, SerializedAgentSize, MPI_UNSIGNED_CHAR, destinationNode, 0, MPI_COMM_WORLD);
-								delete[] serializedAgent;
-								break;
+									//send agent to create phantom
+									destinationNode = i + 1;
+									MPI_Bcast(&destinationNode, 1, MPI_INT, 0, MPI_COMM_WORLD);
+									//cout << "Bcasted destination node" << endl;
+									//sending agent
+									MPI_Send(&SerializedAgentSize, 1, MPI_INT, destinationNode, 0, MPI_COMM_WORLD);
+									MPI_Send(serializedAgent, SerializedAgentSize, MPI_UNSIGNED_CHAR, destinationNode, 0, MPI_COMM_WORLD);
+									delete[] serializedAgent;
+								}
 							}
 						}
 					}
+					#pragma endregion top side
+
+					//diagonals
+					#pragma region top right corner
+					if(y >= modelingAreas[it->second._nodeID - 1].second.y() - minimalHeight 
+					&& x >= modelingAreas[it->second._nodeID - 1].second.x() - minimalWidth) // top side adjacent area
+					{
+ 						for(int i = 0; i < modelingAreas.size(); i++)
+						{
+							if (it->second._nodeID != i + 1)
+							{
+								if(modelingAreas[i].first.x() == modelingAreas[it->second._nodeID - 1].second.x()//if common side
+								&& modelingAreas[i].first.y() == modelingAreas[it->second._nodeID - 1].second.y())
+								{
+									//cout << "agent at position x: " << x << " " << y << " is in area x: " << modelingAreas[it->second._nodeID - 1].first.x() << " " << modelingAreas[it->second._nodeID - 1].first.y() << " " << modelingAreas[it->second._nodeID - 1].second.x() << " " << modelingAreas[it->second._nodeID - 1].second.y() << " and adjacent by top side" << endl;
+									//request agent
+ 									destinationNode = it->second._nodeID;
+									MPI_Bcast(&destinationNode, 1, MPI_INT, 0, MPI_COMM_WORLD);
+									long long nodeAgentId = it->second._agentID;
+									MPI_Send(&nodeAgentId, 1, MPI_UNSIGNED_LONG_LONG, it->second._nodeID , 0, MPI_COMM_WORLD);
+									//cout << "Agent ID to request phantom: " << nodeAgentId << endl; 
+									//receiving agent
+									int SerializedAgentSize = 0;
+									MPI_Recv(&SerializedAgentSize, 1, MPI_INT, it->second._nodeID, 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
+									//cout << "agert size received" << endl;
+									unsigned char* serializedAgent = new unsigned char[SerializedAgentSize];
+									MPI_Recv(serializedAgent, SerializedAgentSize, MPI_UNSIGNED_CHAR, it->second._nodeID, 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
+									//cout << "Agent received" << endl;
+
+									//send agent to create phantom
+									destinationNode = i + 1;
+									MPI_Bcast(&destinationNode, 1, MPI_INT, 0, MPI_COMM_WORLD);
+									//cout << "Bcasted destination node" << endl;
+									//sending agent
+									MPI_Send(&SerializedAgentSize, 1, MPI_INT, destinationNode, 0, MPI_COMM_WORLD);
+									MPI_Send(serializedAgent, SerializedAgentSize, MPI_UNSIGNED_CHAR, destinationNode, 0, MPI_COMM_WORLD);
+									delete[] serializedAgent;
+								}
+							}
+						}
+					}
+					#pragma endregion top right corner
+
+					#pragma region top left corner
+					if(y >= modelingAreas[it->second._nodeID - 1].second.y() - minimalHeight 
+					&& x <= modelingAreas[it->second._nodeID - 1].first.x() + minimalWidth) // top side adjacent area
+					{
+						for(int i = 0; i < modelingAreas.size(); i++)
+						{
+							if (it->second._nodeID != i + 1)
+							{
+								if(modelingAreas[i].second.x() == modelingAreas[it->second._nodeID - 1].first.x()//if common side
+								&& modelingAreas[i].first.y() == modelingAreas[it->second._nodeID - 1].second.y())
+								{
+									//cout << "agent at position x: " << x << " " << y << " is in area x: " << modelingAreas[it->second._nodeID - 1].first.x() << " " << modelingAreas[it->second._nodeID - 1].first.y() << " " << modelingAreas[it->second._nodeID - 1].second.x() << " " << modelingAreas[it->second._nodeID - 1].second.y() << " and adjacent by top side" << endl;
+									//request agent
+									destinationNode = it->second._nodeID;
+									MPI_Bcast(&destinationNode, 1, MPI_INT, 0, MPI_COMM_WORLD);
+									long long nodeAgentId = it->second._agentID;
+									MPI_Send(&nodeAgentId, 1, MPI_UNSIGNED_LONG_LONG, it->second._nodeID , 0, MPI_COMM_WORLD);
+									//cout << "Agent ID to request phantom: " << nodeAgentId << endl; 
+									//receiving agent
+									int SerializedAgentSize = 0;
+									MPI_Recv(&SerializedAgentSize, 1, MPI_INT, it->second._nodeID, 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
+									//cout << "agert size received" << endl;
+									unsigned char* serializedAgent = new unsigned char[SerializedAgentSize];
+									MPI_Recv(serializedAgent, SerializedAgentSize, MPI_UNSIGNED_CHAR, it->second._nodeID, 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
+									//cout << "Agent received" << endl;
+
+									//send agent to create phantom
+									destinationNode = i + 1;
+									MPI_Bcast(&destinationNode, 1, MPI_INT, 0, MPI_COMM_WORLD);
+									//cout << "Bcasted destination node" << endl;
+									//sending agent
+									MPI_Send(&SerializedAgentSize, 1, MPI_INT, destinationNode, 0, MPI_COMM_WORLD);
+									MPI_Send(serializedAgent, SerializedAgentSize, MPI_UNSIGNED_CHAR, destinationNode, 0, MPI_COMM_WORLD);
+									delete[] serializedAgent;
+								}
+							}
+						}
+					}
+					#pragma endregion top left corner
+
+					#pragma region bottom left corner
+					if(y <= modelingAreas[it->second._nodeID - 1].first.y() + minimalHeight 
+					&& x <= modelingAreas[it->second._nodeID - 1].first.x() + minimalWidth) // top side adjacent area
+					{
+						for(int i = 0; i < modelingAreas.size(); i++)
+						{
+							if (it->second._nodeID != i + 1)
+							{
+								if(modelingAreas[i].second.x() == modelingAreas[it->second._nodeID - 1].first.x()//if common side
+								&& modelingAreas[i].second.y() == modelingAreas[it->second._nodeID - 1].first.y())
+								{
+									//cout << "agent at position x: " << x << " " << y << " is in area x: " << modelingAreas[it->second._nodeID - 1].first.x() << " " << modelingAreas[it->second._nodeID - 1].first.y() << " " << modelingAreas[it->second._nodeID - 1].second.x() << " " << modelingAreas[it->second._nodeID - 1].second.y() << " and adjacent by top side" << endl;
+									//request agent
+									destinationNode = it->second._nodeID;
+									MPI_Bcast(&destinationNode, 1, MPI_INT, 0, MPI_COMM_WORLD);
+									long long nodeAgentId = it->second._agentID;
+									MPI_Send(&nodeAgentId, 1, MPI_UNSIGNED_LONG_LONG, it->second._nodeID , 0, MPI_COMM_WORLD);
+									//cout << "Agent ID to request phantom: " << nodeAgentId << endl; 
+									//receiving agent
+									int SerializedAgentSize = 0;
+									MPI_Recv(&SerializedAgentSize, 1, MPI_INT, it->second._nodeID, 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
+									//cout << "agert size received" << endl;
+									unsigned char* serializedAgent = new unsigned char[SerializedAgentSize];
+									MPI_Recv(serializedAgent, SerializedAgentSize, MPI_UNSIGNED_CHAR, it->second._nodeID, 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
+									//cout << "Agent received" << endl;
+
+									//send agent to create phantom
+									destinationNode = i + 1;
+									MPI_Bcast(&destinationNode, 1, MPI_INT, 0, MPI_COMM_WORLD);
+									//cout << "Bcasted destination node" << endl;
+									//sending agent
+									MPI_Send(&SerializedAgentSize, 1, MPI_INT, destinationNode, 0, MPI_COMM_WORLD);
+									MPI_Send(serializedAgent, SerializedAgentSize, MPI_UNSIGNED_CHAR, destinationNode, 0, MPI_COMM_WORLD);
+									delete[] serializedAgent;
+								}
+							}
+						}
+					}
+					#pragma endregion bottom left corner
+
+					#pragma region bottom right corner
+					if(y <= modelingAreas[it->second._nodeID - 1].first.y() + minimalHeight 
+					&& x >= modelingAreas[it->second._nodeID - 1].second.x() - minimalWidth) // top side adjacent area
+					{
+						for(int i = 0; i < modelingAreas.size(); i++)
+						{
+							if (it->second._nodeID != i + 1)
+							{
+								if(modelingAreas[i].first.x() == modelingAreas[it->second._nodeID - 1].second.x()//if common side
+								&& modelingAreas[i].second.y() == modelingAreas[it->second._nodeID - 1].first.y())
+								{
+									//cout << "agent at position x: " << x << " " << y << " is in area x: " << modelingAreas[it->second._nodeID - 1].first.x() << " " << modelingAreas[it->second._nodeID - 1].first.y() << " " << modelingAreas[it->second._nodeID - 1].second.x() << " " << modelingAreas[it->second._nodeID - 1].second.y() << " and adjacent by top side" << endl;
+									//request agent
+									destinationNode = it->second._nodeID;
+									MPI_Bcast(&destinationNode, 1, MPI_INT, 0, MPI_COMM_WORLD);
+									long long nodeAgentId = it->second._agentID;
+									MPI_Send(&nodeAgentId, 1, MPI_UNSIGNED_LONG_LONG, it->second._nodeID , 0, MPI_COMM_WORLD);
+									//cout << "Agent ID to request phantom: " << nodeAgentId << endl; 
+									//receiving agent
+									int SerializedAgentSize = 0;
+									MPI_Recv(&SerializedAgentSize, 1, MPI_INT, it->second._nodeID, 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
+									//cout << "agert size received" << endl;
+									unsigned char* serializedAgent = new unsigned char[SerializedAgentSize];
+									MPI_Recv(serializedAgent, SerializedAgentSize, MPI_UNSIGNED_CHAR, it->second._nodeID, 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
+									//cout << "Agent received" << endl;
+
+									//send agent to create phantom
+									destinationNode = i + 1;
+									MPI_Bcast(&destinationNode, 1, MPI_INT, 0, MPI_COMM_WORLD);
+									//cout << "Bcasted destination node" << endl;
+									//sending agent
+									MPI_Send(&SerializedAgentSize, 1, MPI_INT, destinationNode, 0, MPI_COMM_WORLD);
+									MPI_Send(serializedAgent, SerializedAgentSize, MPI_UNSIGNED_CHAR, destinationNode, 0, MPI_COMM_WORLD);
+									delete[] serializedAgent;
+								}
+							}
+						}
+					}
+					#pragma endregion bottom right corner
 				}
 			}
 
@@ -925,15 +1107,15 @@ else
 
 void LoadData(vector<vector<Vector2>> &obstacles, vector<Vector2> &agentsPositions)
 {
-	int agentsInAZone = 500;
-	int agentsInBZone = 500;
+	int agentsInAZone = 1;
+	int agentsInBZone = 1;
 
 	//int rank;
 	MPI_Comm_rank(MPI_COMM_WORLD, &myRank);
 	//Agents generating zones
-	Vector2 zomeAMinPoint(0, 0);
-	Vector2 zomeAMaxPoint(50, 100);
-	Vector2 zomeBMinPoint(150, 0);
+	Vector2 zomeAMinPoint(80, 0);
+	Vector2 zomeAMaxPoint(100, 100);
+	Vector2 zomeBMinPoint(100, 0);
 	Vector2 zomeBMaxPoint(200, 100);
 
 	//Loading agents from file
@@ -943,23 +1125,47 @@ void LoadData(vector<vector<Vector2>> &obstacles, vector<Vector2> &agentsPositio
 	//Generating agents at main node
 	if (myRank == 0)
 	{
-		srand(time(nullptr));
+		//srand(time(nullptr));
 
-		//random agents in zone A
-		for (int i = 0; i < agentsInAZone; i++)
-		{
-			Vector2 agentPosition(GenerateRandomBetween(zomeAMinPoint.x(), zomeAMaxPoint.x()), GenerateRandomBetween(zomeAMinPoint.y(), zomeAMaxPoint.y()));
-				//zomeAMinPoint.x() + rand() % (int)zomeAMaxPoint.x(), zomeAMinPoint.y() + rand() % (int)zomeAMaxPoint.y());
-			agentsPositions.push_back(agentPosition);
-		}
+		////random agents in zone A
+		//for (int i = 0; i < agentsInAZone; i++)
+		//{
+		//	Vector2 agentPosition(GenerateRandomBetween(zomeAMinPoint.x(), zomeAMaxPoint.x()), GenerateRandomBetween(zomeAMinPoint.y(), zomeAMaxPoint.y()));
+		//		//zomeAMinPoint.x() + rand() % (int)zomeAMaxPoint.x(), zomeAMinPoint.y() + rand() % (int)zomeAMaxPoint.y());
+		//	agentsPositions.push_back(agentPosition);
+		//}
 
-		//random agents in zone B
-		for (int i = 0; i < agentsInBZone; i++)
-		{
-			Vector2 agentPosition(GenerateRandomBetween(zomeBMinPoint.x(), zomeBMaxPoint.x()), GenerateRandomBetween(zomeBMinPoint.y(), zomeBMaxPoint.y()));
-				//zomeBMinPoint.x() + rand() % (int)zomeBMaxPoint.x(), zomeBMinPoint.y() + rand() % (int)zomeBMaxPoint.y());
-			agentsPositions.push_back(agentPosition);
-		}
+		////random agents in zone B
+		//for (int i = 0; i < agentsInBZone; i++)
+		//{
+		//	Vector2 agentPosition(GenerateRandomBetween(zomeBMinPoint.x(), zomeBMaxPoint.x()), GenerateRandomBetween(zomeBMinPoint.y(), zomeBMaxPoint.y()));
+		//		//zomeBMinPoint.x() + rand() % (int)zomeBMaxPoint.x(), zomeBMinPoint.y() + rand() % (int)zomeBMaxPoint.y());
+		//	agentsPositions.push_back(agentPosition);
+		//}
+
+		Vector2 ag1(99, 49);
+		Vector2 ag2(101, 51);
+
+		Vector2 ag3(99, 51);
+		Vector2 ag4(101, 49);
+
+		//Vector2 ag3(50, 52);
+		//Vector2 ag4(50, 48);
+
+		//Vector2 ag3(50, 52);
+		//Vector2 ag4(50, 48);
+
+		//agentsPositions.push_back(ag1);
+		//agentsPositions.push_back(ag2);
+
+		agentsPositions.push_back(ag1);
+		agentsPositions.push_back(ag2);
+
+		agentsPositions.push_back(ag3);
+		agentsPositions.push_back(ag4);
+
+		//agentsPositions.push_back(ag3);
+		//agentsPositions.push_back(ag4);
 	}
 
 	//Loading obstacles from file
