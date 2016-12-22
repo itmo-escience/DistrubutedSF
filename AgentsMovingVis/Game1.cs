@@ -339,7 +339,7 @@ namespace AgentsMovingVis
                         throw;
                     }
 
-                    if (i <  1000 /*simulationData[currentIteration].agents.Count / 2*/)
+                    if (i < simulationData[currentIteration].agents.Count / 2)
                     {
                         spriteBatch.Draw(agentTexture2D, new Vector2(offset.X + (x * zoom) - (agentTexture2D.Width * 0.03f / 2), offset.Y + (y * zoom) - (agentTexture2D.Height * 0.03f / 2)), null, Color.White, 0.0f, new Vector2(0, 0), new Vector2(0.03f, 0.03f), SpriteEffects.None, 0);
                     }
