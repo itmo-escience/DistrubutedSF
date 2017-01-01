@@ -1,0 +1,15 @@
+-r
+D:\MailCloud\University\ITMO\Work\KarbovskyTasks\parallelSF\ParallelMPISF\ParallelMPISF\My Advisor XE Results - ParallelMPISF\e000\hs002
+-type
+cpu:stack
+--data-limit-mb=100
+--stack-stitching
+--follow-child
+--stackwalk=offline
+--mrte-mode=auto
+--search-dir
+sym=D:\MailCloud\University\ITMO\Work\KarbovskyTasks\parallelSF\ParallelMPISF\ParallelMPISF\x64\Debug
+--search-dir
+sym=D:\MailCloud\University\ITMO\Work\KarbovskyTasks\parallelSF\ParallelMPISF\ParallelMPISF
+--
+D:\MailCloud\University\ITMO\Work\KarbovskyTasks\parallelSF\ParallelMPISF\ParallelMPISF\x64\Debug\ParallelMPISF.exe
