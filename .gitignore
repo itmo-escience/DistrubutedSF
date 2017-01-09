@@ -1,5 +1,39 @@
+### C++ ###
+# Prerequisites
+*.d
+
+# Compiled Object files
+*.slo
+*.lo
+*.o
+*.obj
+
+# Precompiled Headers
+*.gch
+*.pch
+
+# Compiled Dynamic libraries
+*.so
+*.dylib
+*.dll
+
+# Fortran module files
+*.mod
+*.smod
+
+# Compiled Static libraries
+*.lai
+*.la
+*.a
+*.lib
+
+# Executables
+*.exe
+*.out
+*.app
 
 ParallelMPISF/x64/Debug/
 ParallelMPISF/x64/Release/
 AgentsMovingVis/bin/Windows/x86/Release/
 AgentsMovingVis/obj/x86/Release/
+x64/Debug/
