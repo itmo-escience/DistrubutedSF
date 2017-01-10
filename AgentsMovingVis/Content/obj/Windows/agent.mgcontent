@@ -1,9 +1,9 @@
 <?xml version="1.0" encoding="utf-8"?>
 <PipelineBuildEvent xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
-  <SourceFile>C:/Users/vadim/Desktop/ParallelMPISF/ParallelMPISF/AgentsMovingVis/Content/agent.png</SourceFile>
+  <SourceFile>D:/MailCloud/University/ITMO/Work/KarbovskyTasks/parallelSF/ParallelMPISF/AgentsMovingVis/Content/agent.png</SourceFile>
   <SourceTime>2016-11-18T17:01:46.9063686+03:00</SourceTime>
-  <DestFile>C:/Users/vadim/Desktop/ParallelMPISF/ParallelMPISF/AgentsMovingVis/Content/bin/Windows/agent.xnb</DestFile>
-  <DestTime>2017-01-01T13:29:53.8269093+03:00</DestTime>
+  <DestFile>D:/MailCloud/University/ITMO/Work/KarbovskyTasks/parallelSF/ParallelMPISF/AgentsMovingVis/Content/bin/Windows/agent.xnb</DestFile>
+  <DestTime>2017-01-09T16:32:44.1908685+03:00</DestTime>
   <Importer>TextureImporter</Importer>
   <ImporterTime>2016-03-30T09:36:08+03:00</ImporterTime>
   <Processor>TextureProcessor</Processor>

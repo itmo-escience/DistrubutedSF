@@ -4,7 +4,7 @@
   <Platform>Windows</Platform>
   <Config />
   <SourceFiles>
-    <File>C:/Users/vadim/Desktop/ParallelMPISF/ParallelMPISF/AgentsMovingVis/Content/agent.png</File>
-    <File>C:/Users/vadim/Desktop/ParallelMPISF/ParallelMPISF/AgentsMovingVis/Content/Arial.spritefont</File>
+    <File>D:/MailCloud/University/ITMO/Work/KarbovskyTasks/parallelSF/ParallelMPISF/AgentsMovingVis/Content/agent.png</File>
+    <File>D:/MailCloud/University/ITMO/Work/KarbovskyTasks/parallelSF/ParallelMPISF/AgentsMovingVis/Content/Arial.spritefont</File>
   </SourceFiles>
 </SourceFileCollection>

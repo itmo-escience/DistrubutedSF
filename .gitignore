@@ -35,6 +35,10 @@
 ParallelMPISF/x64/Debug/
 ParallelMPISF/x64/Release/
 AgentsMovingVis/bin/Windows/x86/Release/
+AgentsMovingVis/bin/Windows/x86/Debug/
 AgentsMovingVis/obj/x86/Release/
-x64/Debug/
-x64/Release/
+ParallelMPISF/My Advisor XE*
+AgentsMovingVis/*.txt
+AgentsMovingVis/packages.config
+packages/
+

@@ -39,6 +39,7 @@ float GenerateRandomBetween(float LO, float HI);
 void SaveObstaclesToJSON(vector<vector<Vector2> > obstacles, const string path);
 void SavePartitionedAreasToJSON(map<int, pair <Vector2, Vector2> > modelingAreas, const string path, int adjacentAreaWidth);
 void SaveSimDataToFile(string filename, vector<map<long long, pair<Vector2, AgentOnNodeInfo>>> simulationData);
+void SaveSimDataToBinaryFile(string filename, vector<map<long long, pair<Vector2, AgentOnNodeInfo>>> simulationData);
 
 void AgentPropertyConfigBcasting();
 vector<Vector2> ModelingAreaPartitioning(char* argv[]);
@@ -92,11 +93,11 @@ int main(int argc, char* argv[])
 	BroadcastingGeneratedAgents(agentsPositions);
 
 	int iterationNum = 150;
-	int iterationTimeStart;
+	//int iterationTimeStart;
 
 	for (int iter = 0; iter < iterationNum; iter++)
 	{
-		iterationTimeStart = clock();
+		//iterationTimeStart = clock();
 
 		if(myRank == 0)
 		{
@@ -105,17 +106,26 @@ int main(int argc, char* argv[])
 
 		SendNewVelocities();
 		ExchangingByPhantoms(); //If some agents in adjacent areas
+		if(iter != 0)
+		{
+			SavingModelingData();	//Main node put agents positions to list
+		}
 		DoSimulationStep();     //Workers perform simulation step
 		UpdateAgentsPositionOnMainNode(); //Workers send agents new positions to main node
 		AgentsShifting();		//If some agent crossed modeling subarea
-		SavingModelingData();	//Main node put agents positions to list
+		if(iter == (iterationNum - 1))
+		{
+			SavingModelingData();	//Main node put agents positions to list
+		}
 
-		printf ("Iteration time: (%f seconds).\n",((float)clock() - iterationTimeStart)/CLOCKS_PER_SEC);
+		//printf ("Iteration time: (%f seconds).\n",((float)clock() - iterationTimeStart)/CLOCKS_PER_SEC);
 	}
 
 	if (myRank == 0)
 	{
-		SaveSimDataToFile("simData.txt", simulationData);
+		printf ("program working time without data saving: (%f seconds).\n",(clock() - (float)startTime)/CLOCKS_PER_SEC);
+		SaveSimDataToBinaryFile("simData.data", simulationData);
+		//SaveSimDataToFile("simData.txt", simulationData);
 	}
 
 	int deletingStartTime = clock();
@@ -124,7 +134,7 @@ int main(int argc, char* argv[])
 	printf ("Deleting time:  (%f seconds).\n",((float)clock() - deletingStartTime)/CLOCKS_PER_SEC);
 
 	MPI_Finalize();
-	cout << myRank << "After finalization at:" << clock()<< endl;
+	//cout << myRank << " After finalization at:" << clock()<< endl;
 
 	int workTime = clock() - startTime;
 	printf ("program working time: %d clicks (%f seconds).\n",workTime,((float)workTime)/CLOCKS_PER_SEC);
@@ -442,6 +452,39 @@ void SaveObstaclesToJSON(vector<vector<Vector2> > obstacles, const string path)
 	agentsPositionsFile.close();
 }
 
+void SaveSimDataToBinaryFile(string filename, vector<map<long long, pair<Vector2, AgentOnNodeInfo>>> simulationData)
+{
+	int writingToFileStartTime = clock();
+	std::fstream agentsPositionsFile;
+	agentsPositionsFile.open(filename, ios::out | ios::trunc | ios::binary);
+
+	int iterations = simulationData.size(); 
+	agentsPositionsFile.write((char*)&iterations, sizeof (iterations));	//int Iterations count
+	for(int i = 0; i < simulationData.size(); i++)
+	{
+		agentsPositionsFile.write((char*)&i, sizeof (i));	//Iteration
+		int agentsCount = simulationData[i].size();
+		agentsPositionsFile.write((char*)&agentsCount, sizeof (agentsCount));	//int agents count
+		for (std::map<long long, pair<Vector2, AgentOnNodeInfo>>::iterator agentsIterator = simulationData[i].begin(); agentsIterator !=  simulationData[i].end(); ++agentsIterator)
+		{
+				agentsPositionsFile.write((char*)&agentsIterator->second.second.isDeleted, sizeof (agentsIterator->second.second.isDeleted));	 //Bool flag is deleted
+
+				agentsPositionsFile.write((char*)&agentsIterator->first, sizeof (agentsIterator->first)); //long long agent ID
+
+				//agentsPositionsFile.write((char*)&agentsIterator->second.second._nodeID, sizeof (agentsIterator->second.second._nodeID));	//int nodeId
+
+				float x = agentsIterator->second.first.x();
+				agentsPositionsFile.write((char*)&x, sizeof (x));	//float x
+	
+				float y = agentsIterator->second.first.y();
+				agentsPositionsFile.write((char*)&y, sizeof (y));	//float y
+		}
+	}
+	agentsPositionsFile.close();
+
+	printf ("Writing to file time: (%f seconds).\n",((float)clock() - writingToFileStartTime)/CLOCKS_PER_SEC);
+}
+
 void SaveSimDataToFile(string filename, vector<map<long long, pair<Vector2, AgentOnNodeInfo>>> simulationData)
 {
 	int writingToFileStartTime = clock();
@@ -487,7 +530,7 @@ void SaveSimDataToFile(string filename, vector<map<long long, pair<Vector2, Agen
 	agentsPositionsFile << "]" << endl;
 	agentsPositionsFile.close();
 
-	printf ("Writing to file time: (%f seconds).\n",((float)clock() - writingToFileStartTime)/CLOCKS_PER_SEC);
+	//printf ("Writing to file time: (%f seconds).\n",((float)clock() - writingToFileStartTime)/CLOCKS_PER_SEC);
 }
 
 void AgentPropertyConfigBcasting()
@@ -855,7 +898,7 @@ void SendNewVelocities()
 		//End of broadcasting flag
 		destinationNode = -1;
 		MPI_Bcast(&destinationNode, 1, MPI_INT, 0, MPI_COMM_WORLD);
-		printf("Velocities sending time: (%f seconds).\n", ((float)clock() - velocitiesSendingStartTime) / CLOCKS_PER_SEC);
+		//printf("Velocities sending time: (%f seconds).\n", ((float)clock() - velocitiesSendingStartTime) / CLOCKS_PER_SEC);
 	}
 	else
 	{
@@ -1094,7 +1137,7 @@ void ExchangingByPhantoms()
 		}
 		receivedAgents.clear();
 
-		printf ("ExchangingByPhantoms time: (%f seconds).\n",((float)clock() - ExchangingByPhantomsStartTime)/CLOCKS_PER_SEC);
+		//printf ("ExchangingByPhantoms time: (%f seconds).\n",((float)clock() - ExchangingByPhantomsStartTime)/CLOCKS_PER_SEC);
 	}
 
 	//	#pragma region OLD EXCHANGING ALGORITHM
@@ -1536,7 +1579,7 @@ void UpdateAgentsPositionOnMainNode()
 		int requestNewPositionsStartTime = clock();
 		//cout << "modelingAreas.size(): " << modelingAreas.size() << endl;
 		MPI_Status stat;
-		int agentPosSize = sizeof(size_t) + sizeof(float) + sizeof(float);
+		int agentPosSize = sizeof(long long) + sizeof(float) + sizeof(float);
 		for (int areas = 0; areas < modelingAreas.size(); areas++)
 		{
 			int agentPOsitionsReceivingStartMoment = clock();
@@ -1569,12 +1612,12 @@ void UpdateAgentsPositionOnMainNode()
 				}
 
 				delete[] agentsPositionsBuffer;
-						printf ("Data requestung time: (%f seconds).\n",((float)clock() - agentsPositionsDataReceivingStartTime)/CLOCKS_PER_SEC);
+						//printf ("Data requestung time: (%f seconds).\n",((float)clock() - agentsPositionsDataReceivingStartTime)/CLOCKS_PER_SEC);
 			}
 
-			printf ("Waiting time: (%f seconds).\n", (float)(agentsPositionsDataReceivingStartTime - agentPOsitionsReceivingStartMoment)/CLOCKS_PER_SEC);
+			//printf ("Waiting time: (%f seconds).\n", (float)(agentsPositionsDataReceivingStartTime - agentPOsitionsReceivingStartMoment)/CLOCKS_PER_SEC);
 		}
-		printf ("Requesting new positions time: (%f seconds).\n",((float)clock() - requestNewPositionsStartTime)/CLOCKS_PER_SEC);
+		//printf ("Requesting new positions time: (%f seconds).\n",((float)clock() - requestNewPositionsStartTime)/CLOCKS_PER_SEC);
 	}
 	else
 	{
@@ -1583,7 +1626,7 @@ void UpdateAgentsPositionOnMainNode()
 			int agentsNewPositionsStartMoment = clock();
 
 			//Requesting vector with requesting agents IDs
-			int agentPosSize = sizeof(size_t) + sizeof(float) + sizeof(float);
+			int agentPosSize = sizeof(long long) + sizeof(float) + sizeof(float);
 			int sizeOfAgentPosBuff = 0;
 			//vector<size_t> agentsIds = simulator->getAliveAgentIdsList();
 			vector<Agent*> aliveAagents = simulator->getAliveAgents();
@@ -1594,7 +1637,7 @@ void UpdateAgentsPositionOnMainNode()
 				unsigned char* AgentPosBuffer = new unsigned char[AgentPosBuffSize];
 				int position = 0;
 
-				printf ("Alive agents requesting time: (%f seconds).\n",((float)clock() - agentsNewPositionsStartMoment)/CLOCKS_PER_SEC);
+				//printf ("Alive agents requesting time: (%f seconds).\n",((float)clock() - agentsNewPositionsStartMoment)/CLOCKS_PER_SEC);
 
 				agentsNewPositionsStartMoment = clock();
 				MPIAgent agent;
@@ -1612,14 +1655,14 @@ void UpdateAgentsPositionOnMainNode()
 					MPI_Pack(&yPos, 1, MPI_FLOAT, AgentPosBuffer, AgentPosBuffSize, &position, MPI_COMM_WORLD);
 				}
 				
-				printf ("Agents positions packing time: (%f seconds).\n",((float)clock() - agentsNewPositionsStartMoment)/CLOCKS_PER_SEC);
+				//printf ("Agents positions packing time: (%f seconds).\n",((float)clock() - agentsNewPositionsStartMoment)/CLOCKS_PER_SEC);
 				agentsNewPositionsStartMoment = clock();
 				MPI_Send(&AgentPosBuffSize, 1, MPI_INT, 0, 0, MPI_COMM_WORLD);
 				//cout << "AgentPosBuffSize: " << AgentPosBuffSize << endl;
 				MPI_Send(AgentPosBuffer, position, MPI_PACKED, 0, 0, MPI_COMM_WORLD);
 				//cout << "Buffer sent " << endl;
 				delete[] AgentPosBuffer;
-				printf ("Agents positions sending time: (%f seconds).\n",((float)clock() - agentsNewPositionsStartMoment)/CLOCKS_PER_SEC);
+				//printf ("Agents positions sending time: (%f seconds).\n",((float)clock() - agentsNewPositionsStartMoment)/CLOCKS_PER_SEC);
 			}
 			else
 			{ 
@@ -1635,9 +1678,9 @@ void DoSimulationStep()
 	if(myRank != 0 && myRank < modelingAreas.size() + 1)
 	{
 		//cout << "node: " << myRank << " simulation step started finished " << endl;
-		int sterTimeStart = clock();
+		//int sterTimeStart = clock();
 		simulator->doStep();
-		printf ("%d rank - Step time: (%f seconds).\n", myRank,((float)clock() - sterTimeStart)/CLOCKS_PER_SEC);
+		//printf ("%d rank - Step time: (%f seconds).\n", myRank,((float)clock() - sterTimeStart)/CLOCKS_PER_SEC);
 	}
 }
 
@@ -1646,7 +1689,7 @@ void AgentsShifting()
 	int destinationNode = 0;
 	if(myRank == 0)
 	{
-		int agentsSHiftingTimeStart = clock();
+		//int agentsSHiftingTimeStart = clock();
 		map<long long, MPIAgent> agentsToShift;
 		//cout << "agents shifting started" << endl;
 		//cout << "Rank: " << myRank << " Sending agents IDs for deleting from simulators"<< endl;
@@ -1760,7 +1803,7 @@ void AgentsShifting()
 
 		//destinationNode = -1;
 		//MPI_Bcast(&destinationNode, 1, MPI_INT, 0, MPI_COMM_WORLD); //End of agents shifting
-		printf ("Agents shifting time: (%f seconds).\n",((float)clock() - agentsSHiftingTimeStart)/CLOCKS_PER_SEC);
+		//printf ("Agents shifting time: (%f seconds).\n",((float)clock() - agentsSHiftingTimeStart)/CLOCKS_PER_SEC);
 	}
 	else
 	{
@@ -1830,7 +1873,7 @@ void SavingModelingData()
 {
 	if(myRank == 0)
 	{
-		int savingDataStartTime = clock();
+		//int savingDataStartTime = clock();
 		map<long long, pair<Vector2, AgentOnNodeInfo>> iterationData;
 		for (std::map<long long, AgentOnNodeInfo>::iterator it = AgentsIDMap.begin(); it != AgentsIDMap.end(); ++it)
 		{
@@ -1839,6 +1882,6 @@ void SavingModelingData()
 			iterationData[it->first] = pair<Vector2, AgentOnNodeInfo>(agentPosition, nodeAg);
 		}
 		simulationData.push_back(iterationData);
-		printf ("%d rank - Saving simulating data: (%f seconds).\n", myRank,((float)clock() - savingDataStartTime)/CLOCKS_PER_SEC);
+		//printf ("%d rank - Saving simulating data: (%f seconds).\n", myRank,((float)clock() - savingDataStartTime)/CLOCKS_PER_SEC);
 	}
 }
