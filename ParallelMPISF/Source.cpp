@@ -1539,6 +1539,8 @@ void UpdateAgentsPositionOnMainNode()
 		int agentPosSize = sizeof(size_t) + sizeof(float) + sizeof(float);
 		for (int areas = 0; areas < modelingAreas.size(); areas++)
 		{
+			int agentPOsitionsReceivingStartMoment = clock();
+			int agentsPositionsDataReceivingStartTime = clock();
 			//cout << "Receiving for area " << areas << endl;
 			int agentPosBuffSize;
 			int senderNode;
@@ -1546,6 +1548,7 @@ void UpdateAgentsPositionOnMainNode()
 			//cout << "Receiving from " << stat.MPI_SOURCE << endl;
 			if(agentPosBuffSize > 0)
 			{
+				agentsPositionsDataReceivingStartTime = clock();
 				senderNode = stat.MPI_SOURCE;
 				unsigned char* agentsPositionsBuffer = new unsigned char[agentPosBuffSize];
 				MPI_Recv(agentsPositionsBuffer, agentPosBuffSize, MPI_UNSIGNED_CHAR, senderNode, 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
@@ -1566,7 +1569,10 @@ void UpdateAgentsPositionOnMainNode()
 				}
 
 				delete[] agentsPositionsBuffer;
+						printf ("Data requestung time: (%f seconds).\n",((float)clock() - agentsPositionsDataReceivingStartTime)/CLOCKS_PER_SEC);
 			}
+
+			printf ("Waiting time: (%f seconds).\n", (float)(agentsPositionsDataReceivingStartTime - agentPOsitionsReceivingStartMoment)/CLOCKS_PER_SEC);
 		}
 		printf ("Requesting new positions time: (%f seconds).\n",((float)clock() - requestNewPositionsStartTime)/CLOCKS_PER_SEC);
 	}
@@ -1574,21 +1580,28 @@ void UpdateAgentsPositionOnMainNode()
 	{
 		if(myRank < modelingAreas.size() + 1)
 		{
+			int agentsNewPositionsStartMoment = clock();
 
 			//Requesting vector with requesting agents IDs
 			int agentPosSize = sizeof(size_t) + sizeof(float) + sizeof(float);
 			int sizeOfAgentPosBuff = 0;
-			vector<size_t> agentsIds = simulator->getAliveAgentIdsList();
-			if(agentsIds.size() > 0)
+			//vector<size_t> agentsIds = simulator->getAliveAgentIdsList();
+			vector<Agent*> aliveAagents = simulator->getAliveAgents();
+			if(aliveAagents.size() > 0)
 			{
 				//cout << myRank << " I have " << agentsIds.size() << " agents" << endl;
-				int AgentPosBuffSize = agentPosSize * agentsIds.size();
+				int AgentPosBuffSize = agentPosSize * aliveAagents.size();
 				unsigned char* AgentPosBuffer = new unsigned char[AgentPosBuffSize];
 				int position = 0;
-				for(int ag = 0; ag < agentsIds.size(); ag++)
+
+				printf ("Alive agents requesting time: (%f seconds).\n",((float)clock() - agentsNewPositionsStartMoment)/CLOCKS_PER_SEC);
+
+				agentsNewPositionsStartMoment = clock();
+				MPIAgent agent;
+				for(int ag = 0; ag < aliveAagents.size(); ag++)
 				{
-					Agent* tmpAgent = simulator->getAgent(agentsIds[ag]);
-					MPIAgent agent(tmpAgent);
+					//Agent* tmpAgent = simulator->getAgent(agentsIds[ag]);
+					agent.agent = aliveAagents[ag]; // simulator->getAgent(agentsIds[ag]);
 					agentId = agent.ID();
 					float xPos = agent.Position().x();
 					float yPos = agent.Position().y();
@@ -1598,12 +1611,15 @@ void UpdateAgentsPositionOnMainNode()
 					MPI_Pack(&xPos, 1, MPI_FLOAT, AgentPosBuffer, AgentPosBuffSize, &position, MPI_COMM_WORLD);
 					MPI_Pack(&yPos, 1, MPI_FLOAT, AgentPosBuffer, AgentPosBuffSize, &position, MPI_COMM_WORLD);
 				}
-
+				
+				printf ("Agents positions packing time: (%f seconds).\n",((float)clock() - agentsNewPositionsStartMoment)/CLOCKS_PER_SEC);
+				agentsNewPositionsStartMoment = clock();
 				MPI_Send(&AgentPosBuffSize, 1, MPI_INT, 0, 0, MPI_COMM_WORLD);
 				//cout << "AgentPosBuffSize: " << AgentPosBuffSize << endl;
 				MPI_Send(AgentPosBuffer, position, MPI_PACKED, 0, 0, MPI_COMM_WORLD);
 				//cout << "Buffer sent " << endl;
 				delete[] AgentPosBuffer;
+				printf ("Agents positions sending time: (%f seconds).\n",((float)clock() - agentsNewPositionsStartMoment)/CLOCKS_PER_SEC);
 			}
 			else
 			{ 
