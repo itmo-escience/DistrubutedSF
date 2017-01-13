@@ -8,6 +8,9 @@
 #include "../../ParallelMPISF/social-phys-lib-private/SF/include/MPIAgent.h"
 #include <set>
 #include "AgentOnNodeInfo.h"
+//#include <vld.h>
+//#define OVERRIDE_NEW_DELETE
+//#include "C:\Program Files\PureDevSoftware\MemPro\MemProLib\src\MemPro.cpp"
 
 using namespace std;
 using namespace SF;
@@ -40,6 +43,7 @@ void SaveObstaclesToJSON(vector<vector<Vector2> > obstacles, const string path);
 void SavePartitionedAreasToJSON(map<int, pair <Vector2, Vector2> > modelingAreas, const string path, int adjacentAreaWidth);
 void SaveSimDataToFile(string filename, vector<map<long long, pair<Vector2, AgentOnNodeInfo>>> simulationData);
 void SaveSimDataToBinaryFile(string filename, vector<map<long long, pair<Vector2, AgentOnNodeInfo>>> simulationData);
+const string currentDateTime();
 
 void AgentPropertyConfigBcasting();
 vector<Vector2> ModelingAreaPartitioning(char* argv[]);
@@ -66,6 +70,11 @@ int main(int argc, char* argv[])
 		if(myRank == 0)
 		{
 			std::cout << "Error! Invalid number of parameters: " << endl << " min_x min_y max_x max_y agent_calc_radius totalAgentsCount" << endl;
+			//cout << "Your parameters" << endl;
+			//for(int i = 0; i < argc; i++)
+			//{
+			//	cout << argv[i] << endl;
+			//}
 		}
 
 		MPI_Finalize();
@@ -101,7 +110,7 @@ int main(int argc, char* argv[])
 
 		if(myRank == 0)
 		{
-			cout << "Iteration: " << iter << endl;	
+			cout << "Iteration: " << iter << " time: " << currentDateTime() << endl;	
 		}
 
 		SendNewVelocities();
@@ -611,14 +620,14 @@ vector<Vector2> GenerateRandomAgentsPositions()
 		//random agents in zone A
 		for (int i = 0; i < agentsInAZone; i++)
 		{
-			Vector2 agentPosition(GenerateRandomBetween(zomeAMinPoint.x(), zomeAMaxPoint.x()), GenerateRandomBetween(zomeAMinPoint.y(), zomeAMaxPoint.y()));
+			Vector2 agentPosition(GenerateRandomBetween(zomeAMinPoint.x() + 0.01, zomeAMaxPoint.x() - 0.01), GenerateRandomBetween(zomeAMinPoint.y() + 0.01, zomeAMaxPoint.y() - 0.01));
 			agentsPositions.push_back(agentPosition);
 		}
 
 		//random agents in zone B
 		for (int i = 0; i < agentsInBZone; i++)
 		{
-			Vector2 agentPosition(GenerateRandomBetween(zomeBMinPoint.x(), zomeBMaxPoint.x()), GenerateRandomBetween(zomeBMinPoint.y(), zomeBMaxPoint.y()));
+			Vector2 agentPosition(GenerateRandomBetween(zomeBMinPoint.x() + 0.01, zomeBMaxPoint.x() - 0.01), GenerateRandomBetween(zomeBMinPoint.y() + 0.01, zomeBMaxPoint.y() - 0.01));
 			agentsPositions.push_back(agentPosition);
 		}
 	}
@@ -823,9 +832,9 @@ void SendNewVelocities()
 
 	if(myRank == 0)
 	{
-		int velocitiesSendingStartTime = clock();
+		//int velocitiesSendingStartTime = clock();
 
-		int h = GlobalArea.second.y() - GlobalArea.first.y();
+		//int h = GlobalArea.second.y() - GlobalArea.first.y();
 		int w = GlobalArea.second.x() - GlobalArea.first.x();
 
 		size_t agentWithVelSize = sizeof(long long) + sizeof(float) + sizeof(float);
@@ -940,7 +949,7 @@ void SendNewVelocities()
 
 void ExchangingByPhantoms()
 {
-	int ExchangingByPhantomsStartTime = clock();
+	//int ExchangingByPhantomsStartTime = clock();
 	map<int, vector<unsigned char*>> agentsToShift;
 	for(int i = 1; i < modelingAreas.size() + 1; i++) //Initializing map
 	{
@@ -959,7 +968,7 @@ void ExchangingByPhantoms()
 			x = agent.Position().x();
 			y = agent.Position().y();
 
-			pair<Vector2, Vector2> myArea = modelingAreas[myRank];
+			pair<Vector2, Vector2> myArea(modelingAreas[myRank].first, modelingAreas[myRank].second); //= make_pair(modelingAreas[myRank].first, modelingAreas[myRank].second);
 
 			if(		x >= myArea.first.x()	&& x <= myArea.first.x() + adjacentAreaWidth 
 				||	x <= myArea.second.x()	&& x >= myArea.second.x() - adjacentAreaWidth
@@ -1126,6 +1135,14 @@ void ExchangingByPhantoms()
 					MPI_Send(&buffSize, 1, MPI_INT, nd->first, 100, MPI_COMM_WORLD);
 					//cout << myRank << " Zero sent " << endl;
 				}
+			}
+		}
+
+		for(map<int, vector<unsigned char*>>::iterator agtsh = agentsToShift.begin(); agtsh != agentsToShift.end(); ++agtsh)
+		{
+			for(int i = 0; i < agtsh->second.size(); i++)
+			{
+				delete[] agtsh->second[i];
 			}
 		}
 
@@ -1576,14 +1593,14 @@ void UpdateAgentsPositionOnMainNode()
 	size_t agentId;
 	if(myRank == 0)
 	{
-		int requestNewPositionsStartTime = clock();
+		//int requestNewPositionsStartTime = clock();
 		//cout << "modelingAreas.size(): " << modelingAreas.size() << endl;
 		MPI_Status stat;
 		int agentPosSize = sizeof(long long) + sizeof(float) + sizeof(float);
 		for (int areas = 0; areas < modelingAreas.size(); areas++)
 		{
-			int agentPOsitionsReceivingStartMoment = clock();
-			int agentsPositionsDataReceivingStartTime = clock();
+			//int agentPOsitionsReceivingStartMoment = clock();
+			//int agentsPositionsDataReceivingStartTime = clock();
 			//cout << "Receiving for area " << areas << endl;
 			int agentPosBuffSize;
 			int senderNode;
@@ -1591,7 +1608,7 @@ void UpdateAgentsPositionOnMainNode()
 			//cout << "Receiving from " << stat.MPI_SOURCE << endl;
 			if(agentPosBuffSize > 0)
 			{
-				agentsPositionsDataReceivingStartTime = clock();
+				//agentsPositionsDataReceivingStartTime = clock();
 				senderNode = stat.MPI_SOURCE;
 				unsigned char* agentsPositionsBuffer = new unsigned char[agentPosBuffSize];
 				MPI_Recv(agentsPositionsBuffer, agentPosBuffSize, MPI_UNSIGNED_CHAR, senderNode, 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
@@ -1623,7 +1640,7 @@ void UpdateAgentsPositionOnMainNode()
 	{
 		if(myRank < modelingAreas.size() + 1)
 		{
-			int agentsNewPositionsStartMoment = clock();
+			//int agentsNewPositionsStartMoment = clock();
 
 			//Requesting vector with requesting agents IDs
 			int agentPosSize = sizeof(long long) + sizeof(float) + sizeof(float);
@@ -1639,7 +1656,7 @@ void UpdateAgentsPositionOnMainNode()
 
 				//printf ("Alive agents requesting time: (%f seconds).\n",((float)clock() - agentsNewPositionsStartMoment)/CLOCKS_PER_SEC);
 
-				agentsNewPositionsStartMoment = clock();
+				//agentsNewPositionsStartMoment = clock();
 				MPIAgent agent;
 				for(int ag = 0; ag < aliveAagents.size(); ag++)
 				{
@@ -1656,7 +1673,7 @@ void UpdateAgentsPositionOnMainNode()
 				}
 				
 				//printf ("Agents positions packing time: (%f seconds).\n",((float)clock() - agentsNewPositionsStartMoment)/CLOCKS_PER_SEC);
-				agentsNewPositionsStartMoment = clock();
+				//agentsNewPositionsStartMoment = clock();
 				MPI_Send(&AgentPosBuffSize, 1, MPI_INT, 0, 0, MPI_COMM_WORLD);
 				//cout << "AgentPosBuffSize: " << AgentPosBuffSize << endl;
 				MPI_Send(AgentPosBuffer, position, MPI_PACKED, 0, 0, MPI_COMM_WORLD);
@@ -1884,4 +1901,18 @@ void SavingModelingData()
 		simulationData.push_back(iterationData);
 		//printf ("%d rank - Saving simulating data: (%f seconds).\n", myRank,((float)clock() - savingDataStartTime)/CLOCKS_PER_SEC);
 	}
+}
+
+// Get current date/time, format is YYYY-MM-DD.HH:mm:ss
+const string currentDateTime() 
+{
+    time_t     now = time(0);
+    struct tm  tstruct;
+    char       buf[80];
+    tstruct = *localtime(&now);
+    // Visit http://en.cppreference.com/w/cpp/chrono/c/strftime
+    // for more information about date/time format
+    strftime(buf, sizeof(buf), "%Y-%m-%d.%X", &tstruct);
+
+    return buf;
 }
