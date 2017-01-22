@@ -42,3 +42,8 @@ AgentsMovingVis/*.txt
 AgentsMovingVis/packages.config
 packages/
 
+ParallelMPISF/My Inspector XE Results*
+ParallelMPISF/IDebug/
+ParallelMPISF/Debug_PG/
+ParallelMPISF/Debug/
+ParallelMPISF/x64/
