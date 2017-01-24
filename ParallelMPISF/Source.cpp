@@ -8,6 +8,14 @@
 #include "../../ParallelMPISF/social-phys-lib-private/SF/include/MPIAgent.h"
 #include <set>
 #include "AgentOnNodeInfo.h"
+ 
+#include <process.h>  
+
+//#ifdef _DEBUG
+//#include <crtdbg.h>
+//#define _CRTDBG_MAP_ALLOC
+//#endif
+
 //#include <vld.h>
 //#define OVERRIDE_NEW_DELETE
 //#include "C:\Program Files\PureDevSoftware\MemPro\MemProLib\src\MemPro.cpp"
@@ -60,104 +68,117 @@ void SavingModelingData();
 
 int main(int argc, char* argv[])
 {
-	MPI_Init(&argc, &argv);
-	MPI_Comm_rank(MPI_COMM_WORLD, &myRank);
-	MPI_Comm_size(MPI_COMM_WORLD, &commSize);
+	try
+	{
+		// code that might throw exception
+		MPI_Init(&argc, &argv);
+		MPI_Comm_rank(MPI_COMM_WORLD, &myRank);
+		MPI_Comm_size(MPI_COMM_WORLD, &commSize);
 
 #pragma region ARGUMENTS TREATING
-	if (argc != 7)
-	{
-		if(myRank == 0)
+		if (argc != 7)
 		{
-			std::cout << "Error! Invalid number of parameters: " << endl << " min_x min_y max_x max_y agent_calc_radius totalAgentsCount" << endl;
-			//cout << "Your parameters" << endl;
-			//for(int i = 0; i < argc; i++)
-			//{
-			//	cout << argv[i] << endl;
-			//}
+			if(myRank == 0)
+			{
+				std::cout << "Error! Invalid number of parameters: " << endl << " min_x min_y max_x max_y agent_calc_radius totalAgentsCount" << endl;
+				//cout << "Your parameters" << endl;
+				//for(int i = 0; i < argc; i++)
+				//{
+				//	cout << argv[i] << endl;
+				//}
+			}
+
+			MPI_Finalize();
+			return 0;
 		}
 
-		MPI_Finalize();
-		return 0;
-	}
+		if(myRank == 0)
+		{
+			std::cout << "CommSize: " << commSize << endl;
+			printf( "Process id: %d\n", _getpid() );  
+		}
 
-	if(myRank == 0)
-	{
-		std::cout << "CommSize: " << commSize << endl;
-	}
-
-	if(commSize < 2)
-	{
-		MPI_Finalize();
-		return 0;
-	}
+		if(commSize < 2)
+		{
+			MPI_Finalize();
+			return 0;
+		}
 #pragma endregion ARGUMENTS TREATING
 
-	int startTime = clock(); //programm working start moment
-	simulator = new SFSimulator();
 
-	AgentPropertyConfigBcasting();
-	vector<Vector2> agentsPositions = ModelingAreaPartitioning(argv);
-	BcastingObstacles();
-	BroadcastingGeneratedAgents(agentsPositions);
+		simulator = new SFSimulator();
+		AgentPropertyConfigBcasting();
+		vector<Vector2> agentsPositions = ModelingAreaPartitioning(argv);
+		BcastingObstacles();
+		BroadcastingGeneratedAgents(agentsPositions);
 
-	simulationData.reserve(150);
-	int iterationNum = 150;
-	//int iterationTimeStart;
+		simulationData.reserve(150);
+		int iterationNum = 150;
+		int startTime = clock(); //programm working start moment
+		//int iterationTimeStart;
 
-	for (int iter = 0; iter < iterationNum; iter++)
-	{
-		//iterationTimeStart = clock();
 
-		if(myRank == 0)
+
+
+		for (int iter = 0; iter < iterationNum; iter++)
 		{
-			cout << "Iteration: " << iter << " time: " << currentDateTime() << endl;	
+			//iterationTimeStart = clock();
+
+			if(myRank == 0)
+			{
+				cout << "Iteration: " << iter << " time: " << currentDateTime() << endl;	
+			}
+
+			SendNewVelocities();
+			ExchangingByPhantoms(); //If some agents in adjacent areas
+			if(iter != 0)
+			{
+				SavingModelingData();	//Main node put agents positions to list
+			}
+			DoSimulationStep();     //Workers perform simulation step
+			//if(myRank != NULL)
+			//{
+			//	cout << "Iteration: " << iter<< endl;
+			//	auto agentaCountList = simulator ->getCountOfAliveAndDead();
+			//	cout << "Total agents count: " << agentaCountList[0] << endl;
+			//	cout << "Alive agents " << agentaCountList[1] << endl; 
+			//	cout << "Dead agents " << agentaCountList[2] << endl; 	
+			//}
+			UpdateAgentsPositionOnMainNode(); //Workers send agents new positions to main node
+			AgentsShifting();		//If some agent crossed modeling subarea
+			if(iter == (iterationNum - 1))
+			{
+				SavingModelingData();	//Main node put agents positions to list
+			}
+
+			//printf ("Iteration time: (%f seconds).\n",((float)clock() - iterationTimeStart)/CLOCKS_PER_SEC);
 		}
 
-		SendNewVelocities();
-		ExchangingByPhantoms(); //If some agents in adjacent areas
-		if(iter != 0)
+		if (myRank == 0)
 		{
-			SavingModelingData();	//Main node put agents positions to list
-		}
-		DoSimulationStep();     //Workers perform simulation step
-		//if(myRank != NULL)
-		//{
-		//	cout << "Iteration: " << iter<< endl;
-		//	auto agentaCountList = simulator ->getCountOfAliveAndDead();
-		//	cout << "Total agents count: " << agentaCountList[0] << endl;
-		//	cout << "Alive agents " << agentaCountList[1] << endl; 
-		//	cout << "Dead agents " << agentaCountList[2] << endl; 	
-		//}
-		UpdateAgentsPositionOnMainNode(); //Workers send agents new positions to main node
-		AgentsShifting();		//If some agent crossed modeling subarea
-		if(iter == (iterationNum - 1))
-		{
-			SavingModelingData();	//Main node put agents positions to list
+			printf ("program working time without data saving: (%f seconds).\n",(clock() - (float)startTime)/CLOCKS_PER_SEC);
+			SaveSimDataToBinaryFile("simData.data", simulationData);
+			//SaveSimDataToFile("simData.txt", simulationData);
 		}
 
-		//printf ("Iteration time: (%f seconds).\n",((float)clock() - iterationTimeStart)/CLOCKS_PER_SEC);
+		int deletingStartTime = clock();
+		delete defaultAgentConfig;
+		delete simulator;
+		printf ("Deleting time:  (%f seconds).\n",((float)clock() - deletingStartTime)/CLOCKS_PER_SEC);
+
+		MPI_Finalize();
+		//cout << myRank << " After finalization at:" << clock()<< endl;
+
+		int workTime = clock() - startTime;
+		printf ("program working time: %d clicks (%f seconds).\n",workTime,((float)workTime)/CLOCKS_PER_SEC);
+
+		return 0;
+
 	}
-
-	if (myRank == 0)
+	catch(...)
 	{
-		printf ("program working time without data saving: (%f seconds).\n",(clock() - (float)startTime)/CLOCKS_PER_SEC);
-		//SaveSimDataToBinaryFile("simData.data", simulationData);
-		SaveSimDataToFile("simData.txt", simulationData);
+		cerr << "Error occured during simulation initialization at file " << __FILE__ << " line: " << __LINE__ << endl;	
 	}
-
-	int deletingStartTime = clock();
-	delete defaultAgentConfig;
-	delete simulator;
-	printf ("Deleting time:  (%f seconds).\n",((float)clock() - deletingStartTime)/CLOCKS_PER_SEC);
-
-	MPI_Finalize();
-	//cout << myRank << " After finalization at:" << clock()<< endl;
-
-	int workTime = clock() - startTime;
-	printf ("program working time: %d clicks (%f seconds).\n",workTime,((float)workTime)/CLOCKS_PER_SEC);
-
-	return 0;
 }
 
 float GenerateRandomBetween(float LO, float HI)
@@ -1436,7 +1457,7 @@ void AgentsShifting()
 					AgentsIDMap[it->first]._agentID = newAgentId;
 
 					shiftedAgents.insert(it->first);
-					delete serializedAgent;
+					delete[] serializedAgent;
 					break;
 				}
 			}
