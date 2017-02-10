@@ -17,11 +17,20 @@
 #include <time.h>       /* time */
 #include <iostream>
 #include <fstream>
+#ifdef _WIN32
 #include "../../ParallelMPISF/social-phys-lib-private/SF/include/MPIAgent.h"
+#endif
+
+#ifdef linux
+#include "SF/include/MPIAgent.h"
+#endif
+
 #include <set>
 #include "AgentOnNodeInfo.h"
  
-#include <process.h>  
+#ifdef _WIN32
+#include <process.h>
+#endif
 
 //#ifdef _DEBUG
 //#include <crtdbg.h>
@@ -42,13 +51,14 @@ pair<Vector2, Vector2> GlobalArea;
 map<int, pair<Vector2, Vector2> > modelingAreas;
 AgentPropertyConfig* defaultAgentConfig;
 vector<vector<Vector2> > obstacles;
+string modelingDataSavingFile;
 
 map<long long, AgentOnNodeInfo> AgentsIDMap; //Global ID, agent node info
 map<int, map<long long, long long> > NodesAgentsMap;// node id, agent ID on node, gloabal ID;
 long long totalAgentsIDs = 0; 
 map<long long, Vector2> AgentsPositions;
 int adjacentAreaWidth;
-vector<map<long long, pair<Vector2, AgentOnNodeInfo> > > simulationData;
+vector<pair <int, map<long long, pair<Vector2, AgentOnNodeInfo> > > > simulationData;
 
 void LoadData(vector<vector<SF::Vector2> > &obstacles, vector<Vector2> &agentsPositions, pair<Vector2, Vector2> zoneA, pair<Vector2, Vector2> zoneB );
 void SendObstacle(vector<Vector2> obstacle);
@@ -61,8 +71,9 @@ int SendAgent(MPIAgent agent, int dest);
 float GenerateRandomBetween(float LO, float HI);
 void SaveObstaclesToJSON(vector<vector<Vector2> > obstacles, const string &path);
 void SavePartitionedAreasToJSON(map<int, pair <Vector2, Vector2> > modelingAreas, const string &path, int adjacentAreaWidth);
-void SaveSimDataToFile(string filename, const vector<map<long long, pair<Vector2, AgentOnNodeInfo> > >& simulationData);
-void SaveSimDataToBinaryFile(string filename, const vector<map<long long, pair<Vector2, AgentOnNodeInfo> > >& simulationData);
+void SaveSimDataToFile(const string &filename, const vector<map<long long, pair<Vector2, AgentOnNodeInfo> > >& simulationData);
+void SaveSimDataToBinaryFile(const string &filename, const vector< pair < int, map<long long, pair<Vector2, AgentOnNodeInfo> > > >& simulationData);
+void WriteToFileBinarySavedModelingInfo(const string &filename, vector<pair<int, map<long long, pair<Vector2, AgentOnNodeInfo> > > >& simulationData);
 const string currentDateTime();
 
 void AgentPropertyConfigBcasting();
@@ -78,7 +89,7 @@ void ExchangingByPhantoms();
 void UpdateAgentsPositionOnMainNode();
 void DoSimulationStep();
 void AgentsShifting();
-void SavingModelingData();
+void SavingModelingData(int currentIteration, const string &filename);
 
 int main(int argc, char* argv[])
 {
@@ -110,7 +121,9 @@ int main(int argc, char* argv[])
 		{
 			std::cout << "CommSize: " << commSize << endl;
 			std::cout << "SCENERY: " << SCENERY << endl;
-			printf( "Process id: %d\n", _getpid() );  
+			#ifdef _WIN32
+			printf( "Process id: %d\n", _getpid() );
+			#endif
 		}
 
 		if(commSize < 2)
@@ -120,7 +133,8 @@ int main(int argc, char* argv[])
 		}
 #pragma endregion ARGUMENTS TREATING
 
-
+		modelingDataSavingFile = "simData.data";
+		remove(modelingDataSavingFile.c_str());
 		simulator = new SFSimulator();
 		AgentPropertyConfigBcasting();
 		vector<Vector2> agentsPositions = ModelingAreaPartitioning(argv);
@@ -145,7 +159,7 @@ int main(int argc, char* argv[])
 			ExchangingByPhantoms(); //If some agents in adjacent areas
 			if(iter != 0)
 			{
-				SavingModelingData();	//Main node put agents positions to list
+				SavingModelingData(iter, modelingDataSavingFile);	//Main node put agents positions to list
 			}
 			DoSimulationStep();     //Workers perform simulation step
 			//if(myRank != NULL)
@@ -160,7 +174,7 @@ int main(int argc, char* argv[])
 			AgentsShifting();		//If some agent crossed modeling subarea
 			if(iter == (iterationNum - 1))
 			{
-				SavingModelingData();	//Main node put agents positions to list
+				SavingModelingData(iter, modelingDataSavingFile);	//Main node put agents positions to list
 			}
 
 			//printf ("Iteration time: (%f seconds).\n",((float)clock() - iterationTimeStart)/CLOCKS_PER_SEC);
@@ -169,7 +183,8 @@ int main(int argc, char* argv[])
 		if (myRank == 0)
 		{
 			printf ("program working time without data saving: (%f seconds).\n",(clock() - (float)startTime)/CLOCKS_PER_SEC);
-			SaveSimDataToBinaryFile("simData.data", simulationData);
+			WriteToFileBinarySavedModelingInfo(modelingDataSavingFile, simulationData);
+			//SaveSimDataToBinaryFile("simData.data", simulationData);
 			//SaveSimDataToFile("simData.txt", simulationData);
 		}
 
@@ -539,7 +554,39 @@ void SaveObstaclesToJSON(vector<vector<Vector2> > obstacles, const string &path)
 	agentsPositionsFile.close();
 }
 
-void SaveSimDataToBinaryFile(string filename, const vector<map<long long, pair<Vector2, AgentOnNodeInfo> > >& simulationData)
+void WriteToFileBinarySavedModelingInfo(const string &filename, vector<pair<int, map<long long, pair<Vector2, AgentOnNodeInfo> > > >& simulationData)
+{
+	int writingToFileStartTime = clock();
+	std::fstream agentsPositionsFile;
+	agentsPositionsFile.open(filename.c_str(), ios::out | ios::app | ios::binary);
+	
+	for(size_t i = 0; i < simulationData.size(); i++)
+	{
+		agentsPositionsFile.write((char*)&simulationData[i].first, sizeof (simulationData[i].first));	//Iteration
+		int agentsCount = simulationData[i].second.size();
+		agentsPositionsFile.write((char*)&agentsCount, sizeof (agentsCount));	//int agents count
+		for (std::map<long long, pair<Vector2, AgentOnNodeInfo> >::const_iterator agentsIterator = simulationData[i].second.begin(); agentsIterator !=  simulationData[i].second.end(); ++agentsIterator)
+		{
+				agentsPositionsFile.write((char*)&agentsIterator->second.second.isDeleted, sizeof (agentsIterator->second.second.isDeleted));	 //Bool flag is deleted
+
+				agentsPositionsFile.write((char*)&agentsIterator->first, sizeof (agentsIterator->first)); //long long agent ID
+
+				//agentsPositionsFile.write((char*)&agentsIterator->second.second._nodeID, sizeof (agentsIterator->second.second._nodeID));	//int nodeId
+
+				float x = agentsIterator->second.first.x();
+				agentsPositionsFile.write((char*)&x, sizeof (x));	//float x
+	
+				float y = agentsIterator->second.first.y();
+				agentsPositionsFile.write((char*)&y, sizeof (y));	//float y
+		}
+	}
+	agentsPositionsFile.close();
+	simulationData.clear();
+
+	printf ("Writing to file time: (%f seconds).\n",((float)clock() - writingToFileStartTime)/CLOCKS_PER_SEC);
+}
+
+void SaveSimDataToBinaryFile(const string &filename, const vector< pair < int, map<long long, pair<Vector2, AgentOnNodeInfo> > > >& simulationData)
 {
 	int writingToFileStartTime = clock();
 	std::fstream agentsPositionsFile;
@@ -549,10 +596,10 @@ void SaveSimDataToBinaryFile(string filename, const vector<map<long long, pair<V
 	agentsPositionsFile.write((char*)&iterations, sizeof (iterations));	//int Iterations count
 	for(size_t i = 0; i < simulationData.size(); i++)
 	{
-		agentsPositionsFile.write((char*)&i, sizeof (i));	//Iteration
-		int agentsCount = simulationData[i].size();
+		agentsPositionsFile.write((char*)&simulationData[i].first, sizeof (simulationData[i].first));	//Iteration
+		int agentsCount = simulationData[i].second.size();
 		agentsPositionsFile.write((char*)&agentsCount, sizeof (agentsCount));	//int agents count
-		for (std::map<long long, pair<Vector2, AgentOnNodeInfo> >::const_iterator agentsIterator = simulationData[i].begin(); agentsIterator !=  simulationData[i].end(); ++agentsIterator)
+		for (std::map<long long, pair<Vector2, AgentOnNodeInfo> >::const_iterator agentsIterator = simulationData[i].second.begin(); agentsIterator !=  simulationData[i].second.end(); ++agentsIterator)
 		{
 				agentsPositionsFile.write((char*)&agentsIterator->second.second.isDeleted, sizeof (agentsIterator->second.second.isDeleted));	 //Bool flag is deleted
 
@@ -572,11 +619,11 @@ void SaveSimDataToBinaryFile(string filename, const vector<map<long long, pair<V
 	printf ("Writing to file time: (%f seconds).\n",((float)clock() - writingToFileStartTime)/CLOCKS_PER_SEC);
 }
 
-void SaveSimDataToFile(string filename, const vector<map<long long, pair<Vector2, AgentOnNodeInfo> > >& simulationData)
+void SaveSimDataToFile(const string &filename, const vector<map<long long, pair<Vector2, AgentOnNodeInfo> > >& simulationData)
 {
 	//int writingToFileStartTime = clock();
 	std::fstream agentsPositionsFile;
-	agentsPositionsFile.open("simData.txt", ios::out | ios::trunc);
+	agentsPositionsFile.open(filename.c_str(), ios::out | ios::trunc);
 	agentsPositionsFile << "[" << endl;
 
 	for(int i = 0; i < simulationData.size(); i++)
@@ -1879,15 +1926,16 @@ void AgentsShifting()
 	//cout << myRank << "end of AgentsShifting" << endl;
 }
 
-void SavingModelingData()
+void SavingModelingData(int currentIteration, const string &filename)
 {
+	int iterationForWritingToFile = 10;
 	//cout << myRank << "start of SavingModelingData" << endl;
 	try
 	{
 		if(myRank == 0)
 		{
 			//int savingDataStartTime = clock();
-			map<long long, pair<Vector2, AgentOnNodeInfo> > iterationData;
+			pair< int, map<long long, pair<Vector2, AgentOnNodeInfo> > > iterationData;
 			std::map<long long, AgentOnNodeInfo>::iterator it;
 			try
 			{
@@ -1932,7 +1980,8 @@ void SavingModelingData()
 
 					try
 					{
-						iterationData[it->first] = pair<Vector2, AgentOnNodeInfo>(agentPosition, nodeAg);
+						iterationData.first = currentIteration;
+						iterationData.second[it->first] = pair<Vector2, AgentOnNodeInfo>(agentPosition, nodeAg);
 					}
 					catch(...)
 					{
@@ -1961,6 +2010,12 @@ void SavingModelingData()
 				std::cerr << " Error occured at file " << __FILE__ << " function: " << __FUNCTION__ << " line: " << __LINE__ << std::endl;
 				MPI_Finalize();
 				exit(EXIT_FAILURE);
+			}
+
+			//Writing to file if the current iteration is even to predefined
+			if(currentIteration %  iterationForWritingToFile == 0)
+			{
+				WriteToFileBinarySavedModelingInfo(filename, simulationData);
 			}
 		}			
 	}
