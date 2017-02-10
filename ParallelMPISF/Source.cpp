@@ -1,4 +1,7 @@
-#define SCENERY 2
+// This is an independent project of an individual developer. Dear PVS-Studio, please check it.
+// PVS-Studio Static Code Analyzer for C, C++ and C#: http://www.viva64.com
+
+#define SCENERY 3
 //1	Long corridor
 //2	Crowds collapsing
 //3	Passing static crowd
@@ -36,30 +39,30 @@ int myRank, commSize;
 int totalAgentsCount;
 SFSimulator* simulator;
 pair<Vector2, Vector2> GlobalArea;
-map<int, pair<Vector2, Vector2>> modelingAreas;
+map<int, pair<Vector2, Vector2> > modelingAreas;
 AgentPropertyConfig* defaultAgentConfig;
-vector<vector<Vector2>> obstacles;
+vector<vector<Vector2> > obstacles;
 
 map<long long, AgentOnNodeInfo> AgentsIDMap; //Global ID, agent node info
-map<int, map<long long, long long>> NodesAgentsMap;// node id, agent ID on node, gloabal ID;
+map<int, map<long long, long long> > NodesAgentsMap;// node id, agent ID on node, gloabal ID;
 long long totalAgentsIDs = 0; 
 map<long long, Vector2> AgentsPositions;
 int adjacentAreaWidth;
-vector<map<long long, pair<Vector2, AgentOnNodeInfo>>> simulationData;
+vector<map<long long, pair<Vector2, AgentOnNodeInfo> > > simulationData;
 
 void LoadData(vector<vector<SF::Vector2> > &obstacles, vector<Vector2> &agentsPositions, pair<Vector2, Vector2> zoneA, pair<Vector2, Vector2> zoneB );
 void SendObstacle(vector<Vector2> obstacle);
 vector<Vector2> ReceiveObstacle();
 void SendAgentPosition(Vector2 agentsPosition);
 Vector2 ReceiveAgentPosition();
-map<int, pair<Vector2, Vector2>> DivideModelingArea(const pair<Vector2, Vector2> &globalArea, int adjacentAreaWidth);
+map<int, pair<Vector2, Vector2> > DivideModelingArea(const pair<Vector2, Vector2> &globalArea, int adjacentAreaWidth);
 pair<Vector2, Vector2> CreateModelingArea(vector<vector<Vector2> > &obstacles, Vector2 minPoint, Vector2 maxPoint, float borderWidth);
 int SendAgent(MPIAgent agent, int dest);
 float GenerateRandomBetween(float LO, float HI);
 void SaveObstaclesToJSON(vector<vector<Vector2> > obstacles, const string &path);
 void SavePartitionedAreasToJSON(map<int, pair <Vector2, Vector2> > modelingAreas, const string &path, int adjacentAreaWidth);
-void SaveSimDataToFile(string filename, const vector<map<long long, pair<Vector2, AgentOnNodeInfo>>>& simulationData);
-void SaveSimDataToBinaryFile(string filename, const vector<map<long long, pair<Vector2, AgentOnNodeInfo>>>& simulationData);
+void SaveSimDataToFile(string filename, const vector<map<long long, pair<Vector2, AgentOnNodeInfo> > >& simulationData);
+void SaveSimDataToBinaryFile(string filename, const vector<map<long long, pair<Vector2, AgentOnNodeInfo> > >& simulationData);
 const string currentDateTime();
 
 void AgentPropertyConfigBcasting();
@@ -106,6 +109,7 @@ int main(int argc, char* argv[])
 		if(myRank == 0)
 		{
 			std::cout << "CommSize: " << commSize << endl;
+			std::cout << "SCENERY: " << SCENERY << endl;
 			printf( "Process id: %d\n", _getpid() );  
 		}
 
@@ -172,6 +176,25 @@ int main(int argc, char* argv[])
 		int deletingStartTime = clock();
 		delete defaultAgentConfig;
 		delete simulator;
+
+		//for(map<long long, AgentOnNodeInfo> ::iterator it = AgentsIDMap.begin(); it != AgentsIDMap.end(); ++it)
+		//{
+		//	delete it->second;
+		//}
+		//AgentsIDMap.clear();
+
+		//for(int i = 0; i < simulationData.size(); i++)
+		//{
+		//	for(map<long long, pair<Vector2, AgentOnNodeInfo> >::iterator it = simulationData[i].begin(); it != simulationData[i].end(); ++it)
+		//	{
+		//		delete it->second.first;
+		//		delete it->second.second;
+		//	}
+		//	
+		//	simulationData[i].clear();
+		//}
+		//simulationData.clear();
+
 		printf ("Deleting time:  (%f seconds).\n",((float)clock() - deletingStartTime)/CLOCKS_PER_SEC);
 
 		MPI_Finalize();
@@ -188,7 +211,6 @@ int main(int argc, char* argv[])
 		std::cerr << " Error occured at file " << __FILE__ << " function: " << __FUNCTION__ << " line: " << __LINE__ << std::endl;
 		MPI_Finalize();
 		exit(EXIT_FAILURE);
-		return 0;
 	}
 }
 
@@ -250,7 +272,7 @@ Vector2 ReceiveAgentPosition()
 }
 
 //Dividing modeling area to subareas for each nodes. If subarea is smaller than minimal width or height it is not dividing more 
-map<int, pair<Vector2, Vector2>> DivideModelingArea(const pair<Vector2, Vector2> &globalArea, int adjacentAreaWidth)
+map<int, pair<Vector2, Vector2> > DivideModelingArea(const pair<Vector2, Vector2> &globalArea, int adjacentAreaWidth)
 {
 	float minX = globalArea.first.x();
 	float minY = globalArea.first.y();
@@ -326,7 +348,7 @@ map<int, pair<Vector2, Vector2>> DivideModelingArea(const pair<Vector2, Vector2>
 		}
 	}
 
-	map<int, pair<Vector2, Vector2>> areas;
+	map<int, pair<Vector2, Vector2> > areas;
 	for(size_t i = 0; i < resultAreas.size(); i++)
 	{
 		areas[i+1] = resultAreas[i];
@@ -517,12 +539,12 @@ void SaveObstaclesToJSON(vector<vector<Vector2> > obstacles, const string &path)
 	agentsPositionsFile.close();
 }
 
-void SaveSimDataToBinaryFile(string filename, const vector<map<long long, pair<Vector2, AgentOnNodeInfo>>>& simulationData)
+void SaveSimDataToBinaryFile(string filename, const vector<map<long long, pair<Vector2, AgentOnNodeInfo> > >& simulationData)
 {
 	int writingToFileStartTime = clock();
 	std::fstream agentsPositionsFile;
-	agentsPositionsFile.open(filename, ios::out | ios::trunc | ios::binary);
-
+	agentsPositionsFile.open(filename.c_str(), ios::out | ios::trunc | ios::binary);
+	
 	size_t iterations = simulationData.size(); 
 	agentsPositionsFile.write((char*)&iterations, sizeof (iterations));	//int Iterations count
 	for(size_t i = 0; i < simulationData.size(); i++)
@@ -530,7 +552,7 @@ void SaveSimDataToBinaryFile(string filename, const vector<map<long long, pair<V
 		agentsPositionsFile.write((char*)&i, sizeof (i));	//Iteration
 		int agentsCount = simulationData[i].size();
 		agentsPositionsFile.write((char*)&agentsCount, sizeof (agentsCount));	//int agents count
-		for (std::map<long long, pair<Vector2, AgentOnNodeInfo>>::const_iterator agentsIterator = simulationData[i].begin(); agentsIterator !=  simulationData[i].end(); ++agentsIterator)
+		for (std::map<long long, pair<Vector2, AgentOnNodeInfo> >::const_iterator agentsIterator = simulationData[i].begin(); agentsIterator !=  simulationData[i].end(); ++agentsIterator)
 		{
 				agentsPositionsFile.write((char*)&agentsIterator->second.second.isDeleted, sizeof (agentsIterator->second.second.isDeleted));	 //Bool flag is deleted
 
@@ -550,9 +572,9 @@ void SaveSimDataToBinaryFile(string filename, const vector<map<long long, pair<V
 	printf ("Writing to file time: (%f seconds).\n",((float)clock() - writingToFileStartTime)/CLOCKS_PER_SEC);
 }
 
-void SaveSimDataToFile(string filename, const vector<map<long long, pair<Vector2, AgentOnNodeInfo>>>& simulationData)
+void SaveSimDataToFile(string filename, const vector<map<long long, pair<Vector2, AgentOnNodeInfo> > >& simulationData)
 {
-	int writingToFileStartTime = clock();
+	//int writingToFileStartTime = clock();
 	std::fstream agentsPositionsFile;
 	agentsPositionsFile.open("simData.txt", ios::out | ios::trunc);
 	agentsPositionsFile << "[" << endl;
@@ -564,7 +586,7 @@ void SaveSimDataToFile(string filename, const vector<map<long long, pair<Vector2
 		agentsPositionsFile << "\"agents\": [" << endl;
 
 		bool notFirstAgentInSection = false;
-		for (std::map<long long, pair<Vector2, AgentOnNodeInfo>>::const_iterator agentsIterator = simulationData[i].begin(); agentsIterator !=  simulationData[i].end(); ++agentsIterator)
+		for (std::map<long long, pair<Vector2, AgentOnNodeInfo> >::const_iterator agentsIterator = simulationData[i].begin(); agentsIterator !=  simulationData[i].end(); ++agentsIterator)
 		{
 			if (!agentsIterator->second.second.isDeleted)
 			{
@@ -731,7 +753,7 @@ vector<Vector2> GenerateRandomAgentsPositionsScenery3()
 	{
 		int h = GlobalArea.second.y() - GlobalArea.first.y();
 		int w = GlobalArea.second.x() - GlobalArea.first.x();
-		Vector2 zoneAMinPoint(0.3 * w, h);
+		Vector2 zoneAMinPoint(0.3 * w, 0);
 		Vector2 zoneAMaxPoint(0.65 * w, h);
 		pair<Vector2, Vector2> zoneA(zoneAMinPoint, zoneAMaxPoint);
 
@@ -891,7 +913,7 @@ void BroadcastingGeneratedAgents(vector<Vector2> agentsPositions)
 		{
 			int destinationNode = 0;
 			bool IsPOintAdded = false;
-			for(map<int, pair<Vector2, Vector2>>::iterator it = modelingAreas.begin(); it != modelingAreas.end(); ++it)
+			for(map<int, pair<Vector2, Vector2> >::iterator it = modelingAreas.begin(); it != modelingAreas.end(); ++it)
 			{
 				if(agentsPositions[i].x() >= it->second.first.x() && agentsPositions[i].x() < it->second.second.x())
 				{
@@ -961,7 +983,7 @@ void SendNewVelocities()
 	float xVel = 0;
 	float yVel = 0;
 	int agNum = AgentsIDMap.size();
-	MPI_Request req;
+	//MPI_Request req;
 	//cout << myRank << "start of SendNewVelocities" << endl;
 	try
 	{
@@ -974,14 +996,14 @@ void SendNewVelocities()
 
 			size_t agentWithVelSize = sizeof(long long) + sizeof(float) + sizeof(float);
 			//for(int i = 0; i < modelingAreas.size(); i++)
-			//for(map<int, pair<Vector2, Vector2>>::iterator it = modelingAreas.begin(); it != modelingAreas.end(); ++it)
-			for (map<int, map<long long, long long>>::iterator ndIter = NodesAgentsMap.begin(); ndIter != NodesAgentsMap.end(); ++ndIter)
+			//for(map<int, pair<Vector2, Vector2> >::iterator it = modelingAreas.begin(); it != modelingAreas.end(); ++it)
+			for (map<int, map<long long, long long> >::iterator ndIter = NodesAgentsMap.begin(); ndIter != NodesAgentsMap.end(); ++ndIter)
 			{
 				vector<long long> agentsToSend;
 				int position = 0;
 				destinationNode = ndIter->first;
-				//MPI_Bcast(&destinationNode, 1, MPI_INT, 0, MPI_COMM_WORLD);
-				MPI_Ibcast(&destinationNode, 1, MPI_INT, 0, MPI_COMM_WORLD, &req);
+				MPI_Bcast(&destinationNode, 1, MPI_INT, 0, MPI_COMM_WORLD);
+				//MPI_Ibcast(&destinationNode, 1, MPI_INT, 0, MPI_COMM_WORLD, &req);
 
 				for (map<long long, long long>::iterator idIter = ndIter->second.begin(); idIter != ndIter->second.end(); ++idIter)
 				{
@@ -1159,7 +1181,7 @@ void SendNewVelocities()
 					MPI_Pack(&yVel, 1, MPI_FLOAT, buffer, buffSize, &position, MPI_COMM_WORLD);
 				}
 
-				MPI_Wait(&req, MPI_STATUS_IGNORE); 
+				//MPI_Wait(&req, MPI_STATUS_IGNORE); 
 
 				MPI_Send(&buffSize, 1, MPI_INT, destinationNode, 100, MPI_COMM_WORLD);
 				MPI_Send(buffer, position, MPI_PACKED, destinationNode, 100, MPI_COMM_WORLD);
@@ -1168,8 +1190,8 @@ void SendNewVelocities()
 
 			//End of broadcasting flag
 			destinationNode = -1;
-			//MPI_Bcast(&destinationNode, 1, MPI_INT, 0, MPI_COMM_WORLD);
-			MPI_Ibcast(&destinationNode, 1, MPI_INT, 0, MPI_COMM_WORLD, &req);
+			MPI_Bcast(&destinationNode, 1, MPI_INT, 0, MPI_COMM_WORLD);
+			//MPI_Ibcast(&destinationNode, 1, MPI_INT, 0, MPI_COMM_WORLD, &req);
 			//printf("Velocities sending time: (%f seconds).\n", ((float)clock() - velocitiesSendingStartTime) / CLOCKS_PER_SEC);
 		}
 		else
@@ -1180,9 +1202,9 @@ void SendNewVelocities()
 				do
 				{
 					int buffSize = 0;
-					//MPI_Bcast(&destinationNode, 1, MPI_INT, 0, MPI_COMM_WORLD); //Check if it information about agent on this node
-					MPI_Ibcast(&destinationNode, 1, MPI_INT, 0, MPI_COMM_WORLD, &req); //Check if it information about agent on this node
-					MPI_Wait(&req, MPI_STATUS_IGNORE); 
+					MPI_Bcast(&destinationNode, 1, MPI_INT, 0, MPI_COMM_WORLD); //Check if it information about agent on this node
+					//MPI_Ibcast(&destinationNode, 1, MPI_INT, 0, MPI_COMM_WORLD, &req); //Check if it information about agent on this node
+					//MPI_Wait(&req, MPI_STATUS_IGNORE); 
 					//cout << "Node " << destinationNode << " receive agents new velocities" << endl;
 					if (destinationNode == myRank)
 					{
@@ -1216,7 +1238,6 @@ void SendNewVelocities()
 		std::cerr << " Error occured at file " << __FILE__ << " function: " << __FUNCTION__ << " line: " << __LINE__ << std::endl;
 		MPI_Finalize();
 		exit(EXIT_FAILURE);
-		return;
 	}
 
 	//cout << myRank << "end of SendNewVelocities" << endl;
@@ -1245,7 +1266,7 @@ void ExchangingByPhantoms()
 		{
 			//cout << myRank << " In ExchangingByPhantoms "  << modelingAreas[myRank].first.x() << " " << modelingAreas[myRank].first.y() << " " << modelingAreas[myRank].second.x() << " " << modelingAreas[myRank].second.y() << endl;
 			//int ExchangingByPhantomsStartTime = clock();
-			map<int, vector<unsigned char*>> agentsToShift;
+			map<int, vector<unsigned char*> > agentsToShift;
 			for(int i = 1; i < modelingAreas.size() + 1; i++) //Initializing map
 			{
 				vector<unsigned char*> serializedAgentsVector;
@@ -1269,7 +1290,7 @@ void ExchangingByPhantoms()
 					||	y <= myArea.second.y()	&& y >= myArea.second.y() - adjacentAreaWidth ) //checking for placing in adjacent area
 				{
 					//cout << " Agent with coords x:" << x << " y:" << y << "is in adjacent area of "  << myArea.first.x() << " " << myArea.first.y() << " " << myArea.second.x()  << " " << myArea.second.y() << endl;
-					for(map<int, pair<Vector2, Vector2>>::iterator ar = modelingAreas.begin(); ar != modelingAreas.end(); ++ar)
+					for(map<int, pair<Vector2, Vector2> >::iterator ar = modelingAreas.begin(); ar != modelingAreas.end(); ++ar)
 					{
 						if(ar->first != myRank)
 						{
@@ -1380,7 +1401,7 @@ void ExchangingByPhantoms()
 			int position = 0;
 			int agentSize = 0;
 
-			for(map<int, pair<Vector2, Vector2>>::iterator nd = modelingAreas.begin(); nd != modelingAreas.end(); ++nd)
+			for(map<int, pair<Vector2, Vector2> >::iterator nd = modelingAreas.begin(); nd != modelingAreas.end(); ++nd)
 			{
 				//cout << "Current shifting iter: " << nd->first << endl;
 				buffSize = 0;
@@ -1460,7 +1481,7 @@ void ExchangingByPhantoms()
 				}
 			}
 
-			for(map<int, vector<unsigned char*>>::iterator agtsh = agentsToShift.begin(); agtsh != agentsToShift.end(); ++agtsh)
+			for(map<int, vector<unsigned char*> >::iterator agtsh = agentsToShift.begin(); agtsh != agentsToShift.end(); ++agtsh)
 			{
 				for(int i = 0; i < agtsh->second.size(); i++)
 				{
@@ -1485,7 +1506,6 @@ void ExchangingByPhantoms()
 		std::cerr << " Error occured at file " << __FILE__ << " function: " << __FUNCTION__ << " line: " << __LINE__ << std::endl;	
 		MPI_Finalize();
 		exit(EXIT_FAILURE);
-		return;
 	}
 
 	//cout << myRank << "end of ExchangingByPhantoms" << endl;
@@ -1523,7 +1543,7 @@ void UpdateAgentsPositionOnMainNode()
 					}
 					catch (std::bad_alloc& ba) 
 					{
-						cerr << ba.what() <<  " Memory overflow at file " << __FILE__ << " line: " << __LINE__ << endl;	
+						cerr << ba.what() <<  " Memory overflow at file " << __FILE__ << " function: " << __FUNCTION__ << " line: " << __LINE__ << endl;	
 						MPI_Finalize();
 						exit(EXIT_FAILURE);
 					}
@@ -1657,7 +1677,6 @@ void DoSimulationStep()
 		std::cerr << " Error occured at file " << __FILE__ << " function: " << __FUNCTION__ << " line: " << __LINE__ << std::endl;
 		MPI_Finalize();
 		exit(EXIT_FAILURE);
-		return;
 	}
 	//cout << myRank << "end of DoSimulationStep" << endl;
 }
@@ -1720,7 +1739,7 @@ void AgentsShifting()
 				float y = it->second.Position().y();
 
 				//for(int ar = 0; ar < modelingAreas.size(); ar++)
-				for(map<int, pair<Vector2, Vector2>> :: iterator ar = modelingAreas.begin(); ar != modelingAreas.end(); ++ar)
+				for(map<int, pair<Vector2, Vector2> > :: iterator ar = modelingAreas.begin(); ar != modelingAreas.end(); ++ar)
 				{
 					if(ar->second.first.x() <= x && x <= ar->second.second.x()
 						&& ar->second.first.y() <= y && y <= ar->second.second.y())
@@ -1855,7 +1874,6 @@ void AgentsShifting()
 		std::cerr << " Error occured at file " << __FILE__ << " function: " << __FUNCTION__ << " line: " << __LINE__ << std::endl;
 		MPI_Finalize();
 		exit(EXIT_FAILURE);
-		return;
 	}
 	//cout << myRank << " AgentsShifting finished" << endl;
 	//cout << myRank << "end of AgentsShifting" << endl;
@@ -1869,23 +1887,94 @@ void SavingModelingData()
 		if(myRank == 0)
 		{
 			//int savingDataStartTime = clock();
-			map<long long, pair<Vector2, AgentOnNodeInfo>> iterationData;
-			for (std::map<long long, AgentOnNodeInfo>::iterator it = AgentsIDMap.begin(); it != AgentsIDMap.end(); ++it)
+			map<long long, pair<Vector2, AgentOnNodeInfo> > iterationData;
+			std::map<long long, AgentOnNodeInfo>::iterator it;
+			try
 			{
-				Vector2 agentPosition(AgentsPositions[it->first].x(), AgentsPositions[it->first].y());
-				AgentOnNodeInfo nodeAg(it->second._nodeID,it->second._agentID, it->second.isDeleted);
-				iterationData[it->first] = pair<Vector2, AgentOnNodeInfo>(agentPosition, nodeAg);
+
+				for (it = AgentsIDMap.begin(); it != AgentsIDMap.end(); ++it)
+				{
+					Vector2 agentPosition;
+					try
+					{
+						map<long long, Vector2>::iterator pos = AgentsPositions.find(it->first);
+						if(pos != AgentsPositions.end())
+						{
+							agentPosition = Vector2(AgentsPositions[it->first].x(), AgentsPositions[it->first].y());
+						}
+						else
+						{
+							cerr<< " AgentsPositions map  doesnt contain agent with ID: " << it->first << " at file: " << __FILE__ << " function: " << __FUNCTION__ << " line: " << __LINE__ << std::endl;
+							agentPosition = Vector2(-1, -1);
+						}
+					}
+					catch(...)
+					{
+						std::cerr << " Error occured at file " << __FILE__ << " function: " << __FUNCTION__ << " line: " << __LINE__ << std::endl;
+						std::cerr << " Iterator key: " << it->first << std::endl;
+						MPI_Finalize();
+						exit(EXIT_FAILURE);
+					}
+
+					AgentOnNodeInfo nodeAg;
+
+					try
+					{
+						nodeAg = AgentOnNodeInfo(it->second._nodeID,it->second._agentID, it->second.isDeleted);
+					}
+					catch(...)
+					{
+						std::cerr << " Error occured at file " << __FILE__ << " function: " << __FUNCTION__ << " line: " << __LINE__ << std::endl;
+						std::cerr << " Iterator key: " << it->first << std::endl;
+						MPI_Finalize();
+						exit(EXIT_FAILURE);
+					}
+
+					try
+					{
+						iterationData[it->first] = pair<Vector2, AgentOnNodeInfo>(agentPosition, nodeAg);
+					}
+					catch(...)
+					{
+						std::cerr << " Error occured at file " << __FILE__ << " function: " << __FUNCTION__ << " line: " << __LINE__ << std::endl;
+						std::cerr << " Iterator key: " << it->first << std::endl;
+						MPI_Finalize();
+						exit(EXIT_FAILURE);
+					}
+				}
 			}
-			simulationData.push_back(iterationData);
-			//printf ("%d rank - Saving simulating data: (%f seconds).\n", myRank,((float)clock() - savingDataStartTime)/CLOCKS_PER_SEC);
+			catch(...)
+			{
+				std::cerr << " Error occured at file " << __FILE__ << " function: " << __FUNCTION__ << " line: " << __LINE__ << std::endl;
+				std::cerr << " Iterator key: " << it->first << std::endl;
+				MPI_Finalize();
+				exit(EXIT_FAILURE);
+			}
+
+			try
+			{
+				simulationData.push_back(iterationData);
+				//printf ("%d rank - Saving simulating data: (%f seconds).\n", myRank,((float)clock() - savingDataStartTime)/CLOCKS_PER_SEC);
+			}
+			catch(...)
+			{
+				std::cerr << " Error occured at file " << __FILE__ << " function: " << __FUNCTION__ << " line: " << __LINE__ << std::endl;
+				MPI_Finalize();
+				exit(EXIT_FAILURE);
+			}
 		}			
+	}
+	catch (std::bad_alloc& ba) 
+	{
+		cerr << ba.what() <<  " Memory overflow at file " << __FILE__ << " function: " << __FUNCTION__ << " line: " << __LINE__ << endl;	
+		MPI_Finalize();
+		exit(EXIT_FAILURE);
 	}
 	catch(...)
 	{
 		std::cerr << " Error occured at file " << __FILE__ << " function: " << __FUNCTION__ << " line: " << __LINE__ << std::endl;
 		MPI_Finalize();
 		exit(EXIT_FAILURE);
-		return;
 	}
 
 	//cout << myRank << "end of SavingModelingData" << endl;
