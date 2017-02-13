@@ -21,13 +21,16 @@
 #include "../../ParallelMPISF/social-phys-lib-private/SF/include/MPIAgent.h"
 #endif
 
-#ifdef linux
+#ifdef __linux__
 #include "SF/include/MPIAgent.h"
+#include "SF/include/stacktrace.h"
+#define PRINT_STACK_TRACE Util::print_stacktrace();
+#else
+#define PRINT_STACK_TRACE
 #endif
 
 
 #include <set>
-#include <memory>
 #include "AgentOnNodeInfo.h"
 
 #ifdef _WIN32
@@ -49,7 +52,6 @@ using namespace SF;
 int myRank, commSize;
 int totalAgentsCount;
 SFSimulator* simulator;
-//std::auto_ptr<SFSimulator> simulator;
 pair<Vector2, Vector2> GlobalArea;
 map<int, pair<Vector2, Vector2> > modelingAreas;
 AgentPropertyConfig* defaultAgentConfig;
@@ -138,7 +140,6 @@ int main(int argc, char* argv[])
 
 		modelingDataSavingFile = "simData.data";
 		remove(modelingDataSavingFile.c_str());
-		//simulator = std::auto_ptr<SFSimulator>(new SFSimulator());
 		simulator = new SFSimulator();
 		AgentPropertyConfigBcasting();
 		vector<Vector2> agentsPositions = ModelingAreaPartitioning(argv);
@@ -230,6 +231,7 @@ int main(int argc, char* argv[])
 	    // speciffic handling for runtime_error
 		std::cerr << " Error occured at file " << __FILE__ << " function: " << __FUNCTION__ << " line: " << __LINE__ << std::endl;
 	    std::cerr << "Runtime error: " << re.what() << std::endl;
+		PRINT_STACK_TRACE
 	}
 	catch(const std::exception& ex)
 	{
@@ -237,14 +239,14 @@ int main(int argc, char* argv[])
 	    // std::runtime_error which is handled explicitly
 		std::cerr << " Error occured at file " << __FILE__ << " function: " << __FUNCTION__ << " line: " << __LINE__ << std::endl;
 	    std::cerr << "Error occurred: " << ex.what() << std::endl;
+		PRINT_STACK_TRACE
 	}
 	catch(...)
 	{
 		std::cerr << " Error occured at file " << __FILE__ << " function: " << __FUNCTION__ << " line: " << __LINE__ << std::endl;
+		PRINT_STACK_TRACE
 		MPI_Finalize();
 		exit(EXIT_FAILURE);
-
-
 	}
 }
 
@@ -1304,6 +1306,7 @@ void SendNewVelocities()
 	    // speciffic handling for runtime_error
 		std::cerr << " Error occured at file " << __FILE__ << " function: " << __FUNCTION__ << " line: " << __LINE__ << std::endl;
 	    std::cerr << "Runtime error: " << re.what() << std::endl;
+		PRINT_STACK_TRACE
 	}
 	catch(const std::exception& ex)
 	{
@@ -1311,10 +1314,12 @@ void SendNewVelocities()
 	    // std::runtime_error which is handled explicitly
 		std::cerr << " Error occured at file " << __FILE__ << " function: " << __FUNCTION__ << " line: " << __LINE__ << std::endl;
 	    std::cerr << "Error occurred: " << ex.what() << std::endl;
+		PRINT_STACK_TRACE
 	}
 	catch(...)
 	{
 		std::cerr << " Error occured at file " << __FILE__ << " function: " << __FUNCTION__ << " line: " << __LINE__ << std::endl;
+		PRINT_STACK_TRACE
 		MPI_Finalize();
 		exit(EXIT_FAILURE);
 	}
@@ -1585,6 +1590,7 @@ void ExchangingByPhantoms()
 	    // speciffic handling for runtime_error
 		std::cerr << " Error occured at file " << __FILE__ << " function: " << __FUNCTION__ << " line: " << __LINE__ << std::endl;
 	    std::cerr << "Runtime error: " << re.what() << std::endl;
+		PRINT_STACK_TRACE
 	}
 	catch(const std::exception& ex)
 	{
@@ -1592,10 +1598,12 @@ void ExchangingByPhantoms()
 	    // std::runtime_error which is handled explicitly
 		std::cerr << " Error occured at file " << __FILE__ << " function: " << __FUNCTION__ << " line: " << __LINE__ << std::endl;
 	    std::cerr << "Error occurred: " << ex.what() << std::endl;
+		PRINT_STACK_TRACE
 	}
 	catch(...)
 	{
 		std::cerr << " Error occured at file " << __FILE__ << " function: " << __FUNCTION__ << " line: " << __LINE__ << std::endl;	
+		PRINT_STACK_TRACE
 		MPI_Finalize();
 		exit(EXIT_FAILURE);
 	}
@@ -1633,11 +1641,19 @@ void UpdateAgentsPositionOnMainNode()
 						senderNode = stat.MPI_SOURCE;
 						agentsPositionsBuffer = new unsigned char[agentPosBuffSize];
 					}
+					catch (std::bad_alloc& ba) 
+					{
+						cerr << ba.what() <<  " Memory overflow at file " << __FILE__ << " function: " << __FUNCTION__ << " line: " << __LINE__ << endl;	
+						PRINT_STACK_TRACE
+						MPI_Finalize();
+						exit(EXIT_FAILURE);
+					}
 					catch(const std::runtime_error& re)
 					{
 					    // speciffic handling for runtime_error
 						std::cerr << " Error occured at file " << __FILE__ << " function: " << __FUNCTION__ << " line: " << __LINE__ << std::endl;
 					    std::cerr << "Runtime error: " << re.what() << std::endl;
+						PRINT_STACK_TRACE
 					}
 					catch(const std::exception& ex)
 					{
@@ -1645,16 +1661,12 @@ void UpdateAgentsPositionOnMainNode()
 					    // std::runtime_error which is handled explicitly
 						std::cerr << " Error occured at file " << __FILE__ << " function: " << __FUNCTION__ << " line: " << __LINE__ << std::endl;
 					    std::cerr << "Error occurred: " << ex.what() << std::endl;
-					}
-					catch (std::bad_alloc& ba) 
-					{
-						cerr << ba.what() <<  " Memory overflow at file " << __FILE__ << " function: " << __FUNCTION__ << " line: " << __LINE__ << endl;	
-						MPI_Finalize();
-						exit(EXIT_FAILURE);
+						PRINT_STACK_TRACE
 					}
 					catch(...)
 					{
-						std::cerr << " Error occured at file " << __FILE__ << " function: " << __FUNCTION__ << " line: " << __LINE__ << std::endl;	
+						std::cerr << " Error occured at file " << __FILE__ << " function: " << __FUNCTION__ << " line: " << __LINE__ << std::endl;
+						PRINT_STACK_TRACE
 						MPI_Finalize();
 						exit(EXIT_FAILURE);
 						//return;
@@ -1753,6 +1765,7 @@ void UpdateAgentsPositionOnMainNode()
 	    // speciffic handling for runtime_error
 		std::cerr << " Error occured at file " << __FILE__ << " function: " << __FUNCTION__ << " line: " << __LINE__ << std::endl;
 	    std::cerr << "Runtime error: " << re.what() << std::endl;
+		PRINT_STACK_TRACE
 	}
 	catch(const std::exception& ex)
 	{
@@ -1760,10 +1773,12 @@ void UpdateAgentsPositionOnMainNode()
 	    // std::runtime_error which is handled explicitly
 		std::cerr << " Error occured at file " << __FILE__ << " function: " << __FUNCTION__ << " line: " << __LINE__ << std::endl;
 	    std::cerr << "Error occurred: " << ex.what() << std::endl;
+		PRINT_STACK_TRACE
 	}
 	catch(...)
 	{
 		std::cerr << " Error occured at file " << __FILE__ << " function: " << __FUNCTION__ << " line: " << __LINE__ << std::endl;
+		PRINT_STACK_TRACE
 		MPI_Finalize();
 		exit(EXIT_FAILURE);
 		//return;
@@ -1795,6 +1810,7 @@ void DoSimulationStep()
 	    // speciffic handling for runtime_error
 		std::cerr << " Error occured at file " << __FILE__ << " function: " << __FUNCTION__ << " line: " << __LINE__ << std::endl;
 	    std::cerr << "Runtime error: " << re.what() << std::endl;
+		PRINT_STACK_TRACE
 	}
 	catch(const std::exception& ex)
 	{
@@ -1802,10 +1818,12 @@ void DoSimulationStep()
 	    // std::runtime_error which is handled explicitly
 		std::cerr << " Error occured at file " << __FILE__ << " function: " << __FUNCTION__ << " line: " << __LINE__ << std::endl;
 	    std::cerr << "Error occurred: " << ex.what() << std::endl;
+		PRINT_STACK_TRACE
 	}
 	catch(...)
 	{
 		std::cerr << " Error occured at file " << __FILE__ << " function: " << __FUNCTION__ << " line: " << __LINE__ << std::endl;
+		PRINT_STACK_TRACE
 		MPI_Finalize();
 		exit(EXIT_FAILURE);
 	}
@@ -2005,6 +2023,7 @@ void AgentsShifting()
 	    // speciffic handling for runtime_error
 		std::cerr << " Error occured at file " << __FILE__ << " function: " << __FUNCTION__ << " line: " << __LINE__ << std::endl;
 	    std::cerr << "Runtime error: " << re.what() << std::endl;
+		PRINT_STACK_TRACE
 	}
 	catch(const std::exception& ex)
 	{
@@ -2012,10 +2031,12 @@ void AgentsShifting()
 	    // std::runtime_error which is handled explicitly
 		std::cerr << " Error occured at file " << __FILE__ << " function: " << __FUNCTION__ << " line: " << __LINE__ << std::endl;
 	    std::cerr << "Error occurred: " << ex.what() << std::endl;
+		PRINT_STACK_TRACE
 	}
 	catch(...)
 	{
 		std::cerr << " Error occured at file " << __FILE__ << " function: " << __FUNCTION__ << " line: " << __LINE__ << std::endl;
+		PRINT_STACK_TRACE
 		MPI_Finalize();
 		exit(EXIT_FAILURE);
 	}
@@ -2058,6 +2079,7 @@ void SavingModelingData(int currentIteration, const string &filename)
 					    // speciffic handling for runtime_error
 						std::cerr << " Error occured at file " << __FILE__ << " function: " << __FUNCTION__ << " line: " << __LINE__ << std::endl;
 					    std::cerr << "Runtime error: " << re.what() << std::endl;
+						PRINT_STACK_TRACE
 					}
 					catch(const std::exception& ex)
 					{
@@ -2065,11 +2087,13 @@ void SavingModelingData(int currentIteration, const string &filename)
 					    // std::runtime_error which is handled explicitly
 						std::cerr << " Error occured at file " << __FILE__ << " function: " << __FUNCTION__ << " line: " << __LINE__ << std::endl;
 					    std::cerr << "Error occurred: " << ex.what() << std::endl;
+						PRINT_STACK_TRACE
 					}
 					catch(...)
 					{
 						std::cerr << " Error occured at file " << __FILE__ << " function: " << __FUNCTION__ << " line: " << __LINE__ << std::endl;
 						std::cerr << " Iterator key: " << it->first << std::endl;
+						PRINT_STACK_TRACE
 						MPI_Finalize();
 						exit(EXIT_FAILURE);
 					}
@@ -2085,6 +2109,7 @@ void SavingModelingData(int currentIteration, const string &filename)
 					    // speciffic handling for runtime_error
 						std::cerr << " Error occured at file " << __FILE__ << " function: " << __FUNCTION__ << " line: " << __LINE__ << std::endl;
 					    std::cerr << "Runtime error: " << re.what() << std::endl;
+						PRINT_STACK_TRACE
 					}
 					catch(const std::exception& ex)
 					{
@@ -2092,11 +2117,13 @@ void SavingModelingData(int currentIteration, const string &filename)
 					    // std::runtime_error which is handled explicitly
 						std::cerr << " Error occured at file " << __FILE__ << " function: " << __FUNCTION__ << " line: " << __LINE__ << std::endl;
 					    std::cerr << "Error occurred: " << ex.what() << std::endl;
+						PRINT_STACK_TRACE
 					}
 					catch(...)
 					{
 						std::cerr << " Error occured at file " << __FILE__ << " function: " << __FUNCTION__ << " line: " << __LINE__ << std::endl;
 						std::cerr << " Iterator key: " << it->first << std::endl;
+						PRINT_STACK_TRACE
 						MPI_Finalize();
 						exit(EXIT_FAILURE);
 					}
@@ -2111,6 +2138,7 @@ void SavingModelingData(int currentIteration, const string &filename)
 					    // speciffic handling for runtime_error
 						std::cerr << " Error occured at file " << __FILE__ << " function: " << __FUNCTION__ << " line: " << __LINE__ << std::endl;
 					    std::cerr << "Runtime error: " << re.what() << std::endl;
+						PRINT_STACK_TRACE
 					}
 					catch(const std::exception& ex)
 					{
@@ -2118,11 +2146,13 @@ void SavingModelingData(int currentIteration, const string &filename)
 					    // std::runtime_error which is handled explicitly
 						std::cerr << " Error occured at file " << __FILE__ << " function: " << __FUNCTION__ << " line: " << __LINE__ << std::endl;
 					    std::cerr << "Error occurred: " << ex.what() << std::endl;
+						PRINT_STACK_TRACE
 					}
 					catch(...)
 					{
 						std::cerr << " Error occured at file " << __FILE__ << " function: " << __FUNCTION__ << " line: " << __LINE__ << std::endl;
 						std::cerr << " Iterator key: " << it->first << std::endl;
+						PRINT_STACK_TRACE
 						MPI_Finalize();
 						exit(EXIT_FAILURE);
 					}
@@ -2133,6 +2163,7 @@ void SavingModelingData(int currentIteration, const string &filename)
 			    // speciffic handling for runtime_error
 				std::cerr << " Error occured at file " << __FILE__ << " function: " << __FUNCTION__ << " line: " << __LINE__ << std::endl;
 			    std::cerr << "Runtime error: " << re.what() << std::endl;
+				PRINT_STACK_TRACE
 			}
 			catch(const std::exception& ex)
 			{
@@ -2140,11 +2171,13 @@ void SavingModelingData(int currentIteration, const string &filename)
 			    // std::runtime_error which is handled explicitly
 				std::cerr << " Error occured at file " << __FILE__ << " function: " << __FUNCTION__ << " line: " << __LINE__ << std::endl;
 			    std::cerr << "Error occurred: " << ex.what() << std::endl;
+				PRINT_STACK_TRACE
 			}
 			catch(...)
 			{
 				std::cerr << " Error occured at file " << __FILE__ << " function: " << __FUNCTION__ << " line: " << __LINE__ << std::endl;
 				std::cerr << " Iterator key: " << it->first << std::endl;
+				PRINT_STACK_TRACE
 				MPI_Finalize();
 				exit(EXIT_FAILURE);
 			}
@@ -2159,6 +2192,7 @@ void SavingModelingData(int currentIteration, const string &filename)
 			    // speciffic handling for runtime_error
 				std::cerr << " Error occured at file " << __FILE__ << " function: " << __FUNCTION__ << " line: " << __LINE__ << std::endl;
 			    std::cerr << "Runtime error: " << re.what() << std::endl;
+				PRINT_STACK_TRACE
 			}
 			catch(const std::exception& ex)
 			{
@@ -2166,10 +2200,12 @@ void SavingModelingData(int currentIteration, const string &filename)
 			    // std::runtime_error which is handled explicitly
 				std::cerr << " Error occured at file " << __FILE__ << " function: " << __FUNCTION__ << " line: " << __LINE__ << std::endl;
 			    std::cerr << "Error occurred: " << ex.what() << std::endl;
+				PRINT_STACK_TRACE
 			}
 			catch(...)
 			{
 				std::cerr << " Error occured at file " << __FILE__ << " function: " << __FUNCTION__ << " line: " << __LINE__ << std::endl;
+				PRINT_STACK_TRACE
 				MPI_Finalize();
 				exit(EXIT_FAILURE);
 			}
@@ -2183,9 +2219,17 @@ void SavingModelingData(int currentIteration, const string &filename)
 	}
 	catch (std::bad_alloc& ba) 
 	{
-		cerr << ba.what() <<  " Memory overflow at file " << __FILE__ << " function: " << __FUNCTION__ << " line: " << __LINE__ << endl;	
+		cerr << ba.what() <<  " Memory overflow at file " << __FILE__ << " function: " << __FUNCTION__ << " line: " << __LINE__ << endl;
+		PRINT_STACK_TRACE
 		MPI_Finalize();
 		exit(EXIT_FAILURE);
+	}
+	catch(const std::runtime_error& re)
+	{
+	    // speciffic handling for runtime_error
+		std::cerr << " Error occured at file " << __FILE__ << " function: " << __FUNCTION__ << " line: " << __LINE__ << std::endl;
+	    std::cerr << "Runtime error: " << re.what() << std::endl;
+		PRINT_STACK_TRACE
 	}
 	catch(const std::exception& ex)
 	{
@@ -2193,16 +2237,12 @@ void SavingModelingData(int currentIteration, const string &filename)
 	    // std::runtime_error which is handled explicitly
 		std::cerr << " Error occured at file " << __FILE__ << " function: " << __FUNCTION__ << " line: " << __LINE__ << std::endl;
 	    std::cerr << "Error occurred: " << ex.what() << std::endl;
-	}
-	catch(const std::runtime_error& re)
-	{
-	    // speciffic handling for runtime_error
-		std::cerr << " Error occured at file " << __FILE__ << " function: " << __FUNCTION__ << " line: " << __LINE__ << std::endl;
-	    std::cerr << "Runtime error: " << re.what() << std::endl;
+		PRINT_STACK_TRACE
 	}
 	catch(...)
 	{
 		std::cerr << " Error occured at file " << __FILE__ << " function: " << __FUNCTION__ << " line: " << __LINE__ << std::endl;
+		PRINT_STACK_TRACE
 		MPI_Finalize();
 		exit(EXIT_FAILURE);
 	}
