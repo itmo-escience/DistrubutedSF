@@ -1,2 +1,0 @@
-System.NullReferenceException: Ссылка на объект не указывает на экземпляр объекта.
-   в AgentsMovingVis.Game1.Draw(GameTime gameTime) в D:\MailCloud\University\ITMO\Work\KarbovskyTasks\parallelSF\ParallelMPISF\AgentsMovingVis\Game1.cs:строка 266

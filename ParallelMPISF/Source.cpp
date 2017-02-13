@@ -6,7 +6,7 @@
 //2	Crowds collapsing
 //3	Passing static crowd
 #if !defined(SCENERY)
-	#error A scenario is not selected
+#error A scenario is not selected
 #endif
 
 
@@ -25,9 +25,11 @@
 #include "SF/include/MPIAgent.h"
 #endif
 
+
 #include <set>
+#include <memory>
 #include "AgentOnNodeInfo.h"
- 
+
 #ifdef _WIN32
 #include <process.h>
 #endif
@@ -47,6 +49,7 @@ using namespace SF;
 int myRank, commSize;
 int totalAgentsCount;
 SFSimulator* simulator;
+//std::auto_ptr<SFSimulator> simulator;
 pair<Vector2, Vector2> GlobalArea;
 map<int, pair<Vector2, Vector2> > modelingAreas;
 AgentPropertyConfig* defaultAgentConfig;
@@ -121,9 +124,9 @@ int main(int argc, char* argv[])
 		{
 			std::cout << "CommSize: " << commSize << endl;
 			std::cout << "SCENERY: " << SCENERY << endl;
-			#ifdef _WIN32
+#ifdef _WIN32
 			printf( "Process id: %d\n", _getpid() );
-			#endif
+#endif
 		}
 
 		if(commSize < 2)
@@ -135,6 +138,7 @@ int main(int argc, char* argv[])
 
 		modelingDataSavingFile = "simData.data";
 		remove(modelingDataSavingFile.c_str());
+		//simulator = std::auto_ptr<SFSimulator>(new SFSimulator());
 		simulator = new SFSimulator();
 		AgentPropertyConfigBcasting();
 		vector<Vector2> agentsPositions = ModelingAreaPartitioning(argv);
@@ -221,11 +225,26 @@ int main(int argc, char* argv[])
 		return 0;
 
 	}
+	catch(const std::runtime_error& re)
+	{
+	    // speciffic handling for runtime_error
+		std::cerr << " Error occured at file " << __FILE__ << " function: " << __FUNCTION__ << " line: " << __LINE__ << std::endl;
+	    std::cerr << "Runtime error: " << re.what() << std::endl;
+	}
+	catch(const std::exception& ex)
+	{
+	    // speciffic handling for all exceptions extending std::exception, except
+	    // std::runtime_error which is handled explicitly
+		std::cerr << " Error occured at file " << __FILE__ << " function: " << __FUNCTION__ << " line: " << __LINE__ << std::endl;
+	    std::cerr << "Error occurred: " << ex.what() << std::endl;
+	}
 	catch(...)
 	{
 		std::cerr << " Error occured at file " << __FILE__ << " function: " << __FUNCTION__ << " line: " << __LINE__ << std::endl;
 		MPI_Finalize();
 		exit(EXIT_FAILURE);
+
+
 	}
 }
 
@@ -422,19 +441,19 @@ vector<Vector2> ModelingAreaPartitioning(char* argv[])
 	totalAgentsCount =  atoi(argv[6]);
 
 	switch(SCENERY) {
-    case 1 :	
-				agentsPositions = GenerateRandomAgentsPositionsScenery1();
-				break;
-    case 2 :	
-				agentsPositions = GenerateRandomAgentsPositionsScenery2();
-				break;
+	case 1 :	
+		agentsPositions = GenerateRandomAgentsPositionsScenery1();
+		break;
+	case 2 :	
+		agentsPositions = GenerateRandomAgentsPositionsScenery2();
+		break;
 	case 3 :	
-				agentsPositions = GenerateRandomAgentsPositionsScenery3();
-				break;
+		agentsPositions = GenerateRandomAgentsPositionsScenery3();
+		break;
 	default:
-			MPI_Finalize();
-			exit(EXIT_FAILURE);			
-}
+		MPI_Finalize();
+		exit(EXIT_FAILURE);			
+	}
 
 	//agentsPositions = GenerateRandomAgentsPositionsScenery2();
 
@@ -559,7 +578,7 @@ void WriteToFileBinarySavedModelingInfo(const string &filename, vector<pair<int,
 	int writingToFileStartTime = clock();
 	std::fstream agentsPositionsFile;
 	agentsPositionsFile.open(filename.c_str(), ios::out | ios::app | ios::binary);
-	
+
 	for(size_t i = 0; i < simulationData.size(); i++)
 	{
 		agentsPositionsFile.write((char*)&simulationData[i].first, sizeof (simulationData[i].first));	//Iteration
@@ -567,17 +586,17 @@ void WriteToFileBinarySavedModelingInfo(const string &filename, vector<pair<int,
 		agentsPositionsFile.write((char*)&agentsCount, sizeof (agentsCount));	//int agents count
 		for (std::map<long long, pair<Vector2, AgentOnNodeInfo> >::const_iterator agentsIterator = simulationData[i].second.begin(); agentsIterator !=  simulationData[i].second.end(); ++agentsIterator)
 		{
-				agentsPositionsFile.write((char*)&agentsIterator->second.second.isDeleted, sizeof (agentsIterator->second.second.isDeleted));	 //Bool flag is deleted
+			agentsPositionsFile.write((char*)&agentsIterator->second.second.isDeleted, sizeof (agentsIterator->second.second.isDeleted));	 //Bool flag is deleted
 
-				agentsPositionsFile.write((char*)&agentsIterator->first, sizeof (agentsIterator->first)); //long long agent ID
+			agentsPositionsFile.write((char*)&agentsIterator->first, sizeof (agentsIterator->first)); //long long agent ID
 
-				//agentsPositionsFile.write((char*)&agentsIterator->second.second._nodeID, sizeof (agentsIterator->second.second._nodeID));	//int nodeId
+			//agentsPositionsFile.write((char*)&agentsIterator->second.second._nodeID, sizeof (agentsIterator->second.second._nodeID));	//int nodeId
 
-				float x = agentsIterator->second.first.x();
-				agentsPositionsFile.write((char*)&x, sizeof (x));	//float x
-	
-				float y = agentsIterator->second.first.y();
-				agentsPositionsFile.write((char*)&y, sizeof (y));	//float y
+			float x = agentsIterator->second.first.x();
+			agentsPositionsFile.write((char*)&x, sizeof (x));	//float x
+
+			float y = agentsIterator->second.first.y();
+			agentsPositionsFile.write((char*)&y, sizeof (y));	//float y
 		}
 	}
 	agentsPositionsFile.close();
@@ -591,7 +610,7 @@ void SaveSimDataToBinaryFile(const string &filename, const vector< pair < int, m
 	int writingToFileStartTime = clock();
 	std::fstream agentsPositionsFile;
 	agentsPositionsFile.open(filename.c_str(), ios::out | ios::trunc | ios::binary);
-	
+
 	size_t iterations = simulationData.size(); 
 	agentsPositionsFile.write((char*)&iterations, sizeof (iterations));	//int Iterations count
 	for(size_t i = 0; i < simulationData.size(); i++)
@@ -601,17 +620,17 @@ void SaveSimDataToBinaryFile(const string &filename, const vector< pair < int, m
 		agentsPositionsFile.write((char*)&agentsCount, sizeof (agentsCount));	//int agents count
 		for (std::map<long long, pair<Vector2, AgentOnNodeInfo> >::const_iterator agentsIterator = simulationData[i].second.begin(); agentsIterator !=  simulationData[i].second.end(); ++agentsIterator)
 		{
-				agentsPositionsFile.write((char*)&agentsIterator->second.second.isDeleted, sizeof (agentsIterator->second.second.isDeleted));	 //Bool flag is deleted
+			agentsPositionsFile.write((char*)&agentsIterator->second.second.isDeleted, sizeof (agentsIterator->second.second.isDeleted));	 //Bool flag is deleted
 
-				agentsPositionsFile.write((char*)&agentsIterator->first, sizeof (agentsIterator->first)); //long long agent ID
+			agentsPositionsFile.write((char*)&agentsIterator->first, sizeof (agentsIterator->first)); //long long agent ID
 
-				//agentsPositionsFile.write((char*)&agentsIterator->second.second._nodeID, sizeof (agentsIterator->second.second._nodeID));	//int nodeId
+			//agentsPositionsFile.write((char*)&agentsIterator->second.second._nodeID, sizeof (agentsIterator->second.second._nodeID));	//int nodeId
 
-				float x = agentsIterator->second.first.x();
-				agentsPositionsFile.write((char*)&x, sizeof (x));	//float x
-	
-				float y = agentsIterator->second.first.y();
-				agentsPositionsFile.write((char*)&y, sizeof (y));	//float y
+			float x = agentsIterator->second.first.x();
+			agentsPositionsFile.write((char*)&x, sizeof (x));	//float x
+
+			float y = agentsIterator->second.first.y();
+			agentsPositionsFile.write((char*)&y, sizeof (y));	//float y
 		}
 	}
 	agentsPositionsFile.close();
@@ -1072,9 +1091,27 @@ void SendNewVelocities()
 					agentId = AgentsIDMap[agentsToSend[ag]]._agentID;
 
 					switch(SCENERY) {
-						case 1: 					
+					case 1: 					
+						{
+#pragma region Scenery one, long corridor
+							if (AgentsPositions[agentsToSend[ag]].x() <= 0.98 * w)
 							{
-								#pragma region Scenery one, long corridor
+								xVel = 1;
+								yVel = 0;
+							}
+							else //if they reached their destination
+							{
+								xVel = 0;
+								yVel = 0;
+							}
+#pragma endregion Scenery one, long corridor
+						}
+						break;
+					case 2: 					
+						{
+#pragma region Scenery two, crowds collision
+							if (agentsToSend[ag] < agNum / 2) //Agents from zone A NOT WORKING IN COMMON CASE
+							{
 								if (AgentsPositions[agentsToSend[ag]].x() <= 0.98 * w)
 								{
 									xVel = 1;
@@ -1085,68 +1122,50 @@ void SendNewVelocities()
 									xVel = 0;
 									yVel = 0;
 								}
-								#pragma endregion Scenery one, long corridor
 							}
-							break;
-						case 2: 					
+							else //Agents from zone B
 							{
-								#pragma region Scenery two, crowds collision
-								if (agentsToSend[ag] < agNum / 2) //Agents from zone A NOT WORKING IN COMMON CASE
+								if (AgentsPositions[agentsToSend[ag]].x() >= 0.02 * w)
 								{
-									if (AgentsPositions[agentsToSend[ag]].x() <= 0.98 * w)
-									{
-										xVel = 1;
-										yVel = 0;
-									}
-									else //if they reached their destination
-									{
-										xVel = 0;
-										yVel = 0;
-									}
+									xVel = -1;
+									yVel = 0;
 								}
-								else //Agents from zone B
-								{
-									if (AgentsPositions[agentsToSend[ag]].x() >= 0.02 * w)
-									{
-										xVel = -1;
-										yVel = 0;
-									}
-									else //if they reached their destination
-									{
-										xVel = 0;
-										yVel = 0;
-									}
-								}
-								#pragma endregion Scenery two, crowds collision		
-							}
-							break;
-						case 3: 					
-							{
-								#pragma region Scenery three, passing throw static crowd
-								if (agentsToSend[ag] < agNum / 2) //Agents from zone A NOT WORKING IN COMMON CASE
+								else //if they reached their destination
 								{
 									xVel = 0;
 									yVel = 0;
 								}
-								else //Agents from zone B
-								{
-									if (AgentsPositions[agentsToSend[ag]].x() >= 0.02 * w)
-									{
-										xVel = -1;
-										yVel = 0;
-									}
-									else //if they reached their destination
-									{
-										xVel = 0;
-										yVel = 0;
-									}
-								}
-								#pragma endregion Scenery three, passing throw static crowd
 							}
-							break;
-						default:
-							MPI_Finalize();
-							exit(EXIT_FAILURE);		
+#pragma endregion Scenery two, crowds collision		
+						}
+						break;
+					case 3: 					
+						{
+#pragma region Scenery three, passing throw static crowd
+							if (agentsToSend[ag] < agNum / 2) //Agents from zone A NOT WORKING IN COMMON CASE
+							{
+								xVel = 0;
+								yVel = 0;
+							}
+							else //Agents from zone B
+							{
+								if (AgentsPositions[agentsToSend[ag]].x() >= 0.02 * w)
+								{
+									xVel = -1;
+									yVel = 0;
+								}
+								else //if they reached their destination
+								{
+									xVel = 0;
+									yVel = 0;
+								}
+							}
+#pragma endregion Scenery three, passing throw static crowd
+						}
+						break;
+					default:
+						MPI_Finalize();
+						exit(EXIT_FAILURE);		
 
 					}
 
@@ -1279,6 +1298,19 @@ void SendNewVelocities()
 				//cout << "node: " << myRank << " receiving velocities finished " << endl;
 			}
 		}
+	}
+	catch(const std::runtime_error& re)
+	{
+	    // speciffic handling for runtime_error
+		std::cerr << " Error occured at file " << __FILE__ << " function: " << __FUNCTION__ << " line: " << __LINE__ << std::endl;
+	    std::cerr << "Runtime error: " << re.what() << std::endl;
+	}
+	catch(const std::exception& ex)
+	{
+	    // speciffic handling for all exceptions extending std::exception, except
+	    // std::runtime_error which is handled explicitly
+		std::cerr << " Error occured at file " << __FILE__ << " function: " << __FUNCTION__ << " line: " << __LINE__ << std::endl;
+	    std::cerr << "Error occurred: " << ex.what() << std::endl;
 	}
 	catch(...)
 	{
@@ -1547,7 +1579,20 @@ void ExchangingByPhantoms()
 			//cout << " Exchanging finished" << endl; 
 			//printf ("ExchangingByPhantoms time: (%f seconds).\n",((float)clock() - ExchangingByPhantomsStartTime)/CLOCKS_PER_SEC);
 		}
-	}	
+	}
+	catch(const std::runtime_error& re)
+	{
+	    // speciffic handling for runtime_error
+		std::cerr << " Error occured at file " << __FILE__ << " function: " << __FUNCTION__ << " line: " << __LINE__ << std::endl;
+	    std::cerr << "Runtime error: " << re.what() << std::endl;
+	}
+	catch(const std::exception& ex)
+	{
+	    // speciffic handling for all exceptions extending std::exception, except
+	    // std::runtime_error which is handled explicitly
+		std::cerr << " Error occured at file " << __FILE__ << " function: " << __FUNCTION__ << " line: " << __LINE__ << std::endl;
+	    std::cerr << "Error occurred: " << ex.what() << std::endl;
+	}
 	catch(...)
 	{
 		std::cerr << " Error occured at file " << __FILE__ << " function: " << __FUNCTION__ << " line: " << __LINE__ << std::endl;	
@@ -1587,6 +1632,19 @@ void UpdateAgentsPositionOnMainNode()
 						//agentsPositionsDataReceivingStartTime = clock();
 						senderNode = stat.MPI_SOURCE;
 						agentsPositionsBuffer = new unsigned char[agentPosBuffSize];
+					}
+					catch(const std::runtime_error& re)
+					{
+					    // speciffic handling for runtime_error
+						std::cerr << " Error occured at file " << __FILE__ << " function: " << __FUNCTION__ << " line: " << __LINE__ << std::endl;
+					    std::cerr << "Runtime error: " << re.what() << std::endl;
+					}
+					catch(const std::exception& ex)
+					{
+					    // speciffic handling for all exceptions extending std::exception, except
+					    // std::runtime_error which is handled explicitly
+						std::cerr << " Error occured at file " << __FILE__ << " function: " << __FUNCTION__ << " line: " << __LINE__ << std::endl;
+					    std::cerr << "Error occurred: " << ex.what() << std::endl;
 					}
 					catch (std::bad_alloc& ba) 
 					{
@@ -1690,6 +1748,19 @@ void UpdateAgentsPositionOnMainNode()
 			}
 		}
 	}
+	catch(const std::runtime_error& re)
+	{
+	    // speciffic handling for runtime_error
+		std::cerr << " Error occured at file " << __FILE__ << " function: " << __FUNCTION__ << " line: " << __LINE__ << std::endl;
+	    std::cerr << "Runtime error: " << re.what() << std::endl;
+	}
+	catch(const std::exception& ex)
+	{
+	    // speciffic handling for all exceptions extending std::exception, except
+	    // std::runtime_error which is handled explicitly
+		std::cerr << " Error occured at file " << __FILE__ << " function: " << __FUNCTION__ << " line: " << __LINE__ << std::endl;
+	    std::cerr << "Error occurred: " << ex.what() << std::endl;
+	}
 	catch(...)
 	{
 		std::cerr << " Error occured at file " << __FILE__ << " function: " << __FUNCTION__ << " line: " << __LINE__ << std::endl;
@@ -1718,6 +1789,19 @@ void DoSimulationStep()
 			//cout << myRank << " simulation step finished " << endl;
 			//printf ("%d rank - Step time: (%f seconds).\n", myRank,((float)clock() - sterTimeStart)/CLOCKS_PER_SEC);
 		}
+	}
+	catch(const std::runtime_error& re)
+	{
+	    // speciffic handling for runtime_error
+		std::cerr << " Error occured at file " << __FILE__ << " function: " << __FUNCTION__ << " line: " << __LINE__ << std::endl;
+	    std::cerr << "Runtime error: " << re.what() << std::endl;
+	}
+	catch(const std::exception& ex)
+	{
+	    // speciffic handling for all exceptions extending std::exception, except
+	    // std::runtime_error which is handled explicitly
+		std::cerr << " Error occured at file " << __FILE__ << " function: " << __FUNCTION__ << " line: " << __LINE__ << std::endl;
+	    std::cerr << "Error occurred: " << ex.what() << std::endl;
 	}
 	catch(...)
 	{
@@ -1916,6 +2000,19 @@ void AgentsShifting()
 			}
 		}
 	}
+	catch(const std::runtime_error& re)
+	{
+	    // speciffic handling for runtime_error
+		std::cerr << " Error occured at file " << __FILE__ << " function: " << __FUNCTION__ << " line: " << __LINE__ << std::endl;
+	    std::cerr << "Runtime error: " << re.what() << std::endl;
+	}
+	catch(const std::exception& ex)
+	{
+	    // speciffic handling for all exceptions extending std::exception, except
+	    // std::runtime_error which is handled explicitly
+		std::cerr << " Error occured at file " << __FILE__ << " function: " << __FUNCTION__ << " line: " << __LINE__ << std::endl;
+	    std::cerr << "Error occurred: " << ex.what() << std::endl;
+	}
 	catch(...)
 	{
 		std::cerr << " Error occured at file " << __FILE__ << " function: " << __FUNCTION__ << " line: " << __LINE__ << std::endl;
@@ -1956,6 +2053,19 @@ void SavingModelingData(int currentIteration, const string &filename)
 							agentPosition = Vector2(-1, -1);
 						}
 					}
+					catch(const std::runtime_error& re)
+					{
+					    // speciffic handling for runtime_error
+						std::cerr << " Error occured at file " << __FILE__ << " function: " << __FUNCTION__ << " line: " << __LINE__ << std::endl;
+					    std::cerr << "Runtime error: " << re.what() << std::endl;
+					}
+					catch(const std::exception& ex)
+					{
+					    // speciffic handling for all exceptions extending std::exception, except
+					    // std::runtime_error which is handled explicitly
+						std::cerr << " Error occured at file " << __FILE__ << " function: " << __FUNCTION__ << " line: " << __LINE__ << std::endl;
+					    std::cerr << "Error occurred: " << ex.what() << std::endl;
+					}
 					catch(...)
 					{
 						std::cerr << " Error occured at file " << __FILE__ << " function: " << __FUNCTION__ << " line: " << __LINE__ << std::endl;
@@ -1970,6 +2080,19 @@ void SavingModelingData(int currentIteration, const string &filename)
 					{
 						nodeAg = AgentOnNodeInfo(it->second._nodeID,it->second._agentID, it->second.isDeleted);
 					}
+					catch(const std::runtime_error& re)
+					{
+					    // speciffic handling for runtime_error
+						std::cerr << " Error occured at file " << __FILE__ << " function: " << __FUNCTION__ << " line: " << __LINE__ << std::endl;
+					    std::cerr << "Runtime error: " << re.what() << std::endl;
+					}
+					catch(const std::exception& ex)
+					{
+					    // speciffic handling for all exceptions extending std::exception, except
+					    // std::runtime_error which is handled explicitly
+						std::cerr << " Error occured at file " << __FILE__ << " function: " << __FUNCTION__ << " line: " << __LINE__ << std::endl;
+					    std::cerr << "Error occurred: " << ex.what() << std::endl;
+					}
 					catch(...)
 					{
 						std::cerr << " Error occured at file " << __FILE__ << " function: " << __FUNCTION__ << " line: " << __LINE__ << std::endl;
@@ -1983,6 +2106,19 @@ void SavingModelingData(int currentIteration, const string &filename)
 						iterationData.first = currentIteration;
 						iterationData.second[it->first] = pair<Vector2, AgentOnNodeInfo>(agentPosition, nodeAg);
 					}
+					catch(const std::runtime_error& re)
+					{
+					    // speciffic handling for runtime_error
+						std::cerr << " Error occured at file " << __FILE__ << " function: " << __FUNCTION__ << " line: " << __LINE__ << std::endl;
+					    std::cerr << "Runtime error: " << re.what() << std::endl;
+					}
+					catch(const std::exception& ex)
+					{
+					    // speciffic handling for all exceptions extending std::exception, except
+					    // std::runtime_error which is handled explicitly
+						std::cerr << " Error occured at file " << __FILE__ << " function: " << __FUNCTION__ << " line: " << __LINE__ << std::endl;
+					    std::cerr << "Error occurred: " << ex.what() << std::endl;
+					}
 					catch(...)
 					{
 						std::cerr << " Error occured at file " << __FILE__ << " function: " << __FUNCTION__ << " line: " << __LINE__ << std::endl;
@@ -1991,6 +2127,19 @@ void SavingModelingData(int currentIteration, const string &filename)
 						exit(EXIT_FAILURE);
 					}
 				}
+			}
+			catch(const std::runtime_error& re)
+			{
+			    // speciffic handling for runtime_error
+				std::cerr << " Error occured at file " << __FILE__ << " function: " << __FUNCTION__ << " line: " << __LINE__ << std::endl;
+			    std::cerr << "Runtime error: " << re.what() << std::endl;
+			}
+			catch(const std::exception& ex)
+			{
+			    // speciffic handling for all exceptions extending std::exception, except
+			    // std::runtime_error which is handled explicitly
+				std::cerr << " Error occured at file " << __FILE__ << " function: " << __FUNCTION__ << " line: " << __LINE__ << std::endl;
+			    std::cerr << "Error occurred: " << ex.what() << std::endl;
 			}
 			catch(...)
 			{
@@ -2004,6 +2153,19 @@ void SavingModelingData(int currentIteration, const string &filename)
 			{
 				simulationData.push_back(iterationData);
 				//printf ("%d rank - Saving simulating data: (%f seconds).\n", myRank,((float)clock() - savingDataStartTime)/CLOCKS_PER_SEC);
+			}
+			catch(const std::runtime_error& re)
+			{
+			    // speciffic handling for runtime_error
+				std::cerr << " Error occured at file " << __FILE__ << " function: " << __FUNCTION__ << " line: " << __LINE__ << std::endl;
+			    std::cerr << "Runtime error: " << re.what() << std::endl;
+			}
+			catch(const std::exception& ex)
+			{
+			    // speciffic handling for all exceptions extending std::exception, except
+			    // std::runtime_error which is handled explicitly
+				std::cerr << " Error occured at file " << __FILE__ << " function: " << __FUNCTION__ << " line: " << __LINE__ << std::endl;
+			    std::cerr << "Error occurred: " << ex.what() << std::endl;
 			}
 			catch(...)
 			{
@@ -2025,6 +2187,19 @@ void SavingModelingData(int currentIteration, const string &filename)
 		MPI_Finalize();
 		exit(EXIT_FAILURE);
 	}
+	catch(const std::exception& ex)
+	{
+	    // speciffic handling for all exceptions extending std::exception, except
+	    // std::runtime_error which is handled explicitly
+		std::cerr << " Error occured at file " << __FILE__ << " function: " << __FUNCTION__ << " line: " << __LINE__ << std::endl;
+	    std::cerr << "Error occurred: " << ex.what() << std::endl;
+	}
+	catch(const std::runtime_error& re)
+	{
+	    // speciffic handling for runtime_error
+		std::cerr << " Error occured at file " << __FILE__ << " function: " << __FUNCTION__ << " line: " << __LINE__ << std::endl;
+	    std::cerr << "Runtime error: " << re.what() << std::endl;
+	}
 	catch(...)
 	{
 		std::cerr << " Error occured at file " << __FILE__ << " function: " << __FUNCTION__ << " line: " << __LINE__ << std::endl;
@@ -2038,13 +2213,13 @@ void SavingModelingData(int currentIteration, const string &filename)
 // Get current date/time, format is YYYY-MM-DD.HH:mm:ss
 const string currentDateTime() 
 {
-    time_t     now = time(0);
-    struct tm  tstruct;
-    char       buf[80];
-    tstruct = *localtime(&now);
-    // Visit http://en.cppreference.com/w/cpp/chrono/c/strftime
-    // for more information about date/time format
-    strftime(buf, sizeof(buf), "%Y-%m-%d.%X", &tstruct);
+	time_t     now = time(0);
+	struct tm  tstruct;
+	char       buf[80];
+	tstruct = *localtime(&now);
+	// Visit http://en.cppreference.com/w/cpp/chrono/c/strftime
+	// for more information about date/time format
+	strftime(buf, sizeof(buf), "%Y-%m-%d.%X", &tstruct);
 
-    return buf;
+	return buf;
 }
