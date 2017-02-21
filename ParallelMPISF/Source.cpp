@@ -1,7 +1,7 @@
 // This is an independent project of an individual developer. Dear PVS-Studio, please check it.
 // PVS-Studio Static Code Analyzer for C, C++ and C#: http://www.viva64.com
 
-#define SCENERY 3
+#define SCENERY 2
 //1	Long corridor
 //2	Crowds collapsing
 //3	Passing static crowd
@@ -31,6 +31,7 @@
 
 
 #include <set>
+#include <memory>
 #include "AgentOnNodeInfo.h"
 
 #ifdef _WIN32
@@ -51,6 +52,8 @@ using namespace SF;
 
 int myRank, commSize;
 int totalAgentsCount;
+string outputFolderPath;
+//std::unique_ptr<SFSimulator> simulator;
 SFSimulator* simulator;
 pair<Vector2, Vector2> GlobalArea;
 map<int, pair<Vector2, Vector2> > modelingAreas;
@@ -106,11 +109,11 @@ int main(int argc, char* argv[])
 		MPI_Comm_size(MPI_COMM_WORLD, &commSize);
 
 #pragma region ARGUMENTS TREATING
-		if (argc != 7)
+		if (argc != 8)
 		{
 			if(myRank == 0)
 			{
-				std::cerr << "Error! Invalid number of parameters: " << endl << " min_x min_y max_x max_y agent_calc_radius totalAgentsCount" << endl;
+				std::cerr << "Error! Invalid number of parameters: " << endl << " min_x min_y max_x max_y agent_calc_radius totalAgentsCount outputFolderPath" << endl;
 				//cout << "Your parameters" << endl;
 				//for(int i = 0; i < argc; i++)
 				//{
@@ -126,6 +129,8 @@ int main(int argc, char* argv[])
 		{
 			std::cout << "CommSize: " << commSize << endl;
 			std::cout << "SCENERY: " << SCENERY << endl;
+			outputFolderPath = argv[7];
+			outputFolderPath =  outputFolderPath;
 #ifdef _WIN32
 			printf( "Process id: %d\n", _getpid() );
 #endif
@@ -146,8 +151,8 @@ int main(int argc, char* argv[])
 		BcastingObstacles();
 		BroadcastingGeneratedAgents(agentsPositions);
 
-		simulationData.reserve(150);
-		int iterationNum = 150;
+		simulationData.reserve(50);
+		int iterationNum = 250;
 		int startTime = clock(); //programm working start moment
 		//int iterationTimeStart;
 
@@ -159,7 +164,6 @@ int main(int argc, char* argv[])
 			{
 				cout << "Iteration: " << iter << " time: " << currentDateTime() << endl;	
 			}
-
 			SendNewVelocities();
 			ExchangingByPhantoms(); //If some agents in adjacent areas
 			if(iter != 0)
@@ -167,6 +171,10 @@ int main(int argc, char* argv[])
 				SavingModelingData(iter, modelingDataSavingFile);	//Main node put agents positions to list
 			}
 			DoSimulationStep();     //Workers perform simulation step
+			//cout<<"simulator fields sizes"<< std::endl;
+			////simulator->PrintFieldsSize();
+			//cout<< std::endl;
+			//cout<< "simulator->size(): " << simulator->Size() << endl;
 			//if(myRank != NULL)
 			//{
 			//	cout << "Iteration: " << iter<< endl;
@@ -463,8 +471,8 @@ vector<Vector2> ModelingAreaPartitioning(char* argv[])
 
 	if(myRank == 0)
 	{
-		SaveObstaclesToJSON(obstacles, "Obstacles.txt");
-		SavePartitionedAreasToJSON(modelingAreas ,"areas.txt", adjacentAreaWidth);
+		SaveObstaclesToJSON(obstacles, outputFolderPath + "_obstacles.txt");
+		SavePartitionedAreasToJSON(modelingAreas , outputFolderPath + "_areas.txt", adjacentAreaWidth);
 	}
 
 	return agentsPositions;
@@ -579,7 +587,7 @@ void WriteToFileBinarySavedModelingInfo(const string &filename, vector<pair<int,
 {
 	int writingToFileStartTime = clock();
 	std::fstream agentsPositionsFile;
-	agentsPositionsFile.open(filename.c_str(), ios::out | ios::app | ios::binary);
+	agentsPositionsFile.open((outputFolderPath + filename).c_str(), ios::out | ios::app | ios::binary);
 
 	for(size_t i = 0; i < simulationData.size(); i++)
 	{
