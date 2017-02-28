@@ -82,6 +82,7 @@ void SavePartitionedAreasToJSON(map<int, pair <Vector2, Vector2> > modelingAreas
 void SaveSimDataToFile(const string &filename, const vector<map<long long, pair<Vector2, AgentOnNodeInfo> > >& simulationData);
 void SaveSimDataToBinaryFile(const string &filename, const vector< pair < int, map<long long, pair<Vector2, AgentOnNodeInfo> > > >& simulationData);
 void WriteToFileBinarySavedModelingInfo(const string &filename, vector<pair<int, map<long long, pair<Vector2, AgentOnNodeInfo> > > >& simulationData);
+void WriteToFilePlainTextSavedModelingInfo(const string &filename, vector<pair<int, map<long long, pair<Vector2, AgentOnNodeInfo> > > >& simulationData);
 const string currentDateTime();
 
 void AgentPropertyConfigBcasting();
@@ -130,7 +131,6 @@ int main(int argc, char* argv[])
 			std::cout << "CommSize: " << commSize << endl;
 			std::cout << "SCENERY: " << SCENERY << endl;
 			outputFolderPath = argv[7];
-			outputFolderPath =  outputFolderPath;
 #ifdef _WIN32
 			printf( "Process id: %d\n", _getpid() );
 #endif
@@ -165,14 +165,17 @@ int main(int argc, char* argv[])
 				cout << "Iteration: " << iter << " time: " << currentDateTime() << endl;	
 			}
 			SendNewVelocities();
+			clock_t exchangingStartMoment = clock();
 			ExchangingByPhantoms(); //If some agents in adjacent areas
+			printf ("rank: %d Exchanging time: (%f milliseconds).\n", myRank, ((float)clock() - exchangingStartMoment)/(CLOCKS_PER_SEC/1000));
 			if(iter != 0)
 			{
 				SavingModelingData(iter, modelingDataSavingFile);	//Main node put agents positions to list
 			}
 			DoSimulationStep();     //Workers perform simulation step
 			//cout<<"simulator fields sizes"<< std::endl;
-			////simulator->PrintFieldsSize();
+			//simulator->PrintFieldsSize();
+			//cout<< std::endl;
 			//cout<< std::endl;
 			//cout<< "simulator->size(): " << simulator->Size() << endl;
 			//if(myRank != NULL)
@@ -183,7 +186,9 @@ int main(int argc, char* argv[])
 			//	cout << "Alive agents " << agentaCountList[1] << endl; 
 			//	cout << "Dead agents " << agentaCountList[2] << endl; 	
 			//}
+			clock_t updatingAgentsPosOnMainNodeStartMoment = clock();
 			UpdateAgentsPositionOnMainNode(); //Workers send agents new positions to main node
+			printf ("rank: %d Updating agents positions on main node time: (%f milliseconds).\n",myRank, ((float)clock() - updatingAgentsPosOnMainNodeStartMoment)/(CLOCKS_PER_SEC/1000));
 			AgentsShifting();		//If some agent crossed modeling subarea
 			if(iter == (iterationNum - 1))
 			{
@@ -197,6 +202,7 @@ int main(int argc, char* argv[])
 		{
 			printf ("program working time without data saving: (%f seconds).\n",(clock() - (float)startTime)/CLOCKS_PER_SEC);
 			WriteToFileBinarySavedModelingInfo(modelingDataSavingFile, simulationData);
+			//WriteToFilePlainTextSavedModelingInfo(modelingDataSavingFile, simulationData);
 			//SaveSimDataToBinaryFile("simData.data", simulationData);
 			//SaveSimDataToFile("simData.txt", simulationData);
 		}
@@ -268,10 +274,12 @@ void SendObstacle(vector<Vector2> obstacle)
 	int obstaclePointNum = obstacle.size();
 	MPI_Bcast(&obstaclePointNum, 1, MPI_INT, 0, MPI_COMM_WORLD);
 
+	float pointX;
+	float pointY;
 	for(size_t i = 0; i < obstacle.size(); i++)
 	{
-		float pointX = obstacle[i].x();
-		float pointY = obstacle[i].y();
+		pointX = obstacle[i].x();
+		pointY = obstacle[i].y();
 		MPI_Bcast(&pointX, 1, MPI_FLOAT, 0, MPI_COMM_WORLD);
 		MPI_Bcast(&pointY, 1, MPI_FLOAT, 0, MPI_COMM_WORLD);
 	}
@@ -583,6 +591,38 @@ void SaveObstaclesToJSON(vector<vector<Vector2> > obstacles, const string &path)
 	agentsPositionsFile.close();
 }
 
+void WriteToFilePlainTextSavedModelingInfo(const string &filename, vector<pair<int, map<long long, pair<Vector2, AgentOnNodeInfo> > > >& simulationData)
+{
+	int writingToFileStartTime = clock();
+	std::fstream agentsPositionsFile;
+	agentsPositionsFile.open((outputFolderPath + filename).c_str(), ios::out | ios::app);
+
+	for(size_t i = 0; i < simulationData.size(); i++)
+	{
+		agentsPositionsFile << simulationData[i].first << std::endl; 	//Iteration simulationData[i].first
+		int agentsCount = simulationData[i].second.size();
+		agentsPositionsFile << agentsCount << std::endl;	//int agents count
+		for (std::map<long long, pair<Vector2, AgentOnNodeInfo> >::const_iterator agentsIterator = simulationData[i].second.begin(); agentsIterator !=  simulationData[i].second.end(); ++agentsIterator)
+		{
+			agentsPositionsFile << agentsIterator->second.second.isDeleted << std::endl;	 //Bool flag is deleted
+
+			agentsPositionsFile << agentsIterator->first << std::endl; //long long agent ID
+
+			//agentsPositionsFile.write((char*)&agentsIterator->second.second._nodeID, sizeof (agentsIterator->second.second._nodeID));	//int nodeId
+
+			float x = agentsIterator->second.first.x();
+			agentsPositionsFile << x << std::endl;	//float x
+
+			float y = agentsIterator->second.first.y();
+			agentsPositionsFile << y << std::endl;	//float y
+		}
+	}
+	agentsPositionsFile.close();
+	simulationData.clear();
+
+	printf ("Writing to file time: (%f seconds).\n",((float)clock() - writingToFileStartTime)/CLOCKS_PER_SEC);
+}
+
 void WriteToFileBinarySavedModelingInfo(const string &filename, vector<pair<int, map<long long, pair<Vector2, AgentOnNodeInfo> > > >& simulationData)
 {
 	int writingToFileStartTime = clock();
@@ -591,7 +631,7 @@ void WriteToFileBinarySavedModelingInfo(const string &filename, vector<pair<int,
 
 	for(size_t i = 0; i < simulationData.size(); i++)
 	{
-		agentsPositionsFile.write((char*)&simulationData[i].first, sizeof (simulationData[i].first));	//Iteration
+		agentsPositionsFile.write((char*)&simulationData[i].first, sizeof (int)); 	//Iteration simulationData[i].first
 		int agentsCount = simulationData[i].second.size();
 		agentsPositionsFile.write((char*)&agentsCount, sizeof (agentsCount));	//int agents count
 		for (std::map<long long, pair<Vector2, AgentOnNodeInfo> >::const_iterator agentsIterator = simulationData[i].second.begin(); agentsIterator !=  simulationData[i].second.end(); ++agentsIterator)
@@ -625,7 +665,7 @@ void SaveSimDataToBinaryFile(const string &filename, const vector< pair < int, m
 	agentsPositionsFile.write((char*)&iterations, sizeof (iterations));	//int Iterations count
 	for(size_t i = 0; i < simulationData.size(); i++)
 	{
-		agentsPositionsFile.write((char*)&simulationData[i].first, sizeof (simulationData[i].first));	//Iteration
+		agentsPositionsFile.write((char*)&simulationData[i].first, sizeof (int));	//Iteration simulationData[i].first
 		int agentsCount = simulationData[i].second.size();
 		agentsPositionsFile.write((char*)&agentsCount, sizeof (agentsCount));	//int agents count
 		for (std::map<long long, pair<Vector2, AgentOnNodeInfo> >::const_iterator agentsIterator = simulationData[i].second.begin(); agentsIterator !=  simulationData[i].second.end(); ++agentsIterator)
@@ -1366,11 +1406,12 @@ void ExchangingByPhantoms()
 			}
 			float x;
 			float y;
-			vector<size_t> aliveAgents = simulator->getAliveAgentIdsList();
-			//cout << myRank << " Alive agents count " << aliveAgents.size() << endl;
-			for(int i = 0; i < aliveAgents.size(); i++)
+			//vector<size_t> aliveAgents = simulator->getAliveAgentIdsList();
+			std::map<size_t, Agent*> agents = simulator->getAllAgents();
+
+			for(std::map<size_t, Agent*>::iterator it = agents.begin(); it != agents.end(); ++it)
 			{
-				MPIAgent agent = MPIAgent(simulator->getAgent(aliveAgents[i]));
+				MPIAgent agent = MPIAgent(it->second);
 				x = agent.Position().x();
 				y = agent.Position().y();
 
@@ -1392,99 +1433,40 @@ void ExchangingByPhantoms()
 								agentsToShift[ar->first].push_back(serializedAgent);
 								//cout << " Agent with coords x:" << x << " y:" << y << "is in adjacent area to area " << ar->first << endl;
 							}
-
-							//#pragma region left side
-							//						if(ar->second.second.y() == modelingAreas[myRank].second.y()
-							//							&& ar->second.first.y() == modelingAreas[myRank].first.y()
-							//							&& ar->second.second.x() == modelingAreas[myRank].first.x())
-							//						{
-							//							unsigned char* serializedAgent = agent.SerializeAgent();
-							//							agentsToShift[ar->first].push_back(serializedAgent);
-							//							cout << " Agen adjacent to the left side " << endl;
-							//						}
-							//#pragma endregion left side
-							//
-							//#pragma region right side
-							//						if(modelingAreas[myRank].second.y() == ar->second.second.y()//if common side
-							//							&& modelingAreas[myRank].second.x() == ar->second.first.x()
-							//							&& modelingAreas[myRank].first.y() == ar->second.first.y())
-							//						{
-							//							unsigned char* serializedAgent = agent.SerializeAgent();
-							//							agentsToShift[ar->first].push_back(serializedAgent);
-							//							cout << " Agen adjacent to the right side " << endl;
-							//						}
-							//#pragma endregion right side
-							//
-							//#pragma region bottom side
-							//						if(modelingAreas[myRank].first.x() == ar->second.first.x()//if common side
-							//							&& modelingAreas[myRank].first.y() == ar->second.second.y()
-							//							&& modelingAreas[myRank].second.x() == ar->second.second.x())
-							//						{
-							//							unsigned char* serializedAgent = agent.SerializeAgent();
-							//							agentsToShift[ar->first].push_back(serializedAgent);
-							//							cout << " Agen adjacent to the bottom side " << endl;
-							//						}
-							//#pragma endregion bottom side
-							//
-							//#pragma region top side
-							//						if(	ar->second.first.x() == modelingAreas[myRank].first.x()//if common side
-							//							&& ar->second.first.y() == modelingAreas[myRank].second.y()
-							//							&& ar->second.second.x() == modelingAreas[myRank].second.x())
-							//						{
-							//							unsigned char* serializedAgent = agent.SerializeAgent();
-							//							agentsToShift[ar->first].push_back(serializedAgent);
-							//							cout << " Agen adjacent to the top side " << endl;
-							//						}
-							//#pragma endregion top side
-							//
-							//						//diagonals
-							//#pragma region top right corner
-							//						if(ar->second.first.x() == modelingAreas[myRank].second.x()//if common side
-							//							&& ar->second.first.y() == modelingAreas[myRank].second.y())
-							//						{
-							//							unsigned char* serializedAgent = agent.SerializeAgent();
-							//							agentsToShift[ar->first].push_back(serializedAgent);
-							//							cout << " Agen adjacent to the top right side " << endl;
-							//						}
-							//#pragma endregion top right corner
-							//
-							//#pragma region top left corner
-							//						if(ar->second.second.x() == modelingAreas[myRank].first.x()//if common side
-							//							&& ar->second.first.y() == modelingAreas[myRank].second.y())
-							//						{
-							//							unsigned char* serializedAgent = agent.SerializeAgent();
-							//							agentsToShift[ar->first].push_back(serializedAgent);
-							//							cout << " Agen adjacent to the top left side " << endl;
-							//						}
-							//#pragma endregion top left corner
-							//
-							//#pragma region bottom left corner
-							//						if(ar->second.second.x() == modelingAreas[myRank].first.x()//if common side
-							//							&& ar->second.second.y() == modelingAreas[myRank].first.y())
-							//						{
-							//							unsigned char* serializedAgent = agent.SerializeAgent();
-							//							agentsToShift[ar->first].push_back(serializedAgent);
-							//							cout << " Agen adjacent to the bottom left side " << endl;
-							//						}
-							//#pragma endregion bottom left corner
-							//
-							//#pragma region bottom right corner
-							//						if(ar->second.first.x() == modelingAreas[myRank].second.x()//if common side
-							//							&& ar->second.second.y() == modelingAreas[myRank].first.y())
-							//						{
-							//							unsigned char* serializedAgent = agent.SerializeAgent();
-							//							agentsToShift[ar->first].push_back(serializedAgent);
-							//							cout << " Agen adjacent to the bottom right side " << endl;
-							//						}
-							//#pragma endregion bottom right corner
 						}
 					}
 				}
-				//else
-				//{
-				//	cout << "?????Agent with pos " << x << " " << y << " is not adjacent to any area" << endl;
-				//}
 			}
+
+			//cout << myRank << " Alive agents count " << aliveAgents.size() << endl;
+			//for(int i = 0; i < aliveAgents.size(); i++)
+			//{
+			//	MPIAgent agent = MPIAgent(simulator->getAgent(aliveAgents[i]));
+			//	x = agent.Position().x();
+			//	y = agent.Position().y();
+
+			//	pair<Vector2, Vector2> myArea(modelingAreas[myRank].first, modelingAreas[myRank].second); //= make_pair(modelingAreas[myRank].first, modelingAreas[myRank].second);
+
+			//	if(		x >= myArea.first.x()	&& x <= myArea.first.x() + adjacentAreaWidth 
+			//		||	x <= myArea.second.x()	&& x >= myArea.second.x() - adjacentAreaWidth
+			//		||	y >= myArea.first.y()	&& y <= myArea.first.y() + adjacentAreaWidth 
+			//		||	y <= myArea.second.y()	&& y >= myArea.second.y() - adjacentAreaWidth ) //checking for placing in adjacent area
+			//	{
+			//		//cout << " Agent with coords x:" << x << " y:" << y << "is in adjacent area of "  << myArea.first.x() << " " << myArea.first.y() << " " << myArea.second.x()  << " " << myArea.second.y() << endl;
+			//		for(map<int, pair<Vector2, Vector2> >::iterator ar = modelingAreas.begin(); ar != modelingAreas.end(); ++ar)
+			//		{
+			//			if(ar->first != myRank)
+			//			{
+			//				if(IsPointAdjacentToArea(agent.Position(), ar->second, adjacentAreaWidth))
+			//				{
+			//					unsigned char* serializedAgent = agent.SerializeAgent();
+			//					agentsToShift[ar->first].push_back(serializedAgent);
+			//					//cout << " Agent with coords x:" << x << " y:" << y << "is in adjacent area to area " << ar->first << endl;
+			//				}
+			//			}
+			//		}
+			//	}
+			//}
 
 			int buffSize = 0;
 			unsigned char* buffer;
@@ -1847,6 +1829,7 @@ void AgentsShifting()
 		int destinationNode = 0;
 		if(myRank == 0)
 		{
+			float x, y;
 			//int agentsSHiftingTimeStart = clock();
 			map<long long, MPIAgent> agentsToShift;
 			//cout << myRank << "agents shifting started" << endl;
@@ -1855,8 +1838,8 @@ void AgentsShifting()
 			{
 				if(!it->second.isDeleted)
 				{
-					float x = AgentsPositions[it->first].x();
-					float y = AgentsPositions[it->first].y();
+					x = AgentsPositions[it->first].x();
+					y = AgentsPositions[it->first].y();
 					int node = it->second._nodeID;
 					if(x < modelingAreas[node].first.x() || modelingAreas[node].second.x() < x || //outside of its modeling area
 						y < modelingAreas[node].first.y() || modelingAreas[node].second.y() < y)
@@ -2069,12 +2052,14 @@ void SavingModelingData(int currentIteration, const string &filename)
 				for (it = AgentsIDMap.begin(); it != AgentsIDMap.end(); ++it)
 				{
 					Vector2 agentPosition;
+					long long id = it->first;
+					AgentOnNodeInfo* agInfo = &it->second; 
 					try
 					{
-						map<long long, Vector2>::iterator pos = AgentsPositions.find(it->first);
+						map<long long, Vector2>::iterator pos = AgentsPositions.find(id);
 						if(pos != AgentsPositions.end())
 						{
-							agentPosition = Vector2(AgentsPositions[it->first].x(), AgentsPositions[it->first].y());
+							agentPosition = Vector2(AgentsPositions[id].x(), AgentsPositions[id].y());
 						}
 						else
 						{
@@ -2110,7 +2095,7 @@ void SavingModelingData(int currentIteration, const string &filename)
 
 					try
 					{
-						nodeAg = AgentOnNodeInfo(it->second._nodeID,it->second._agentID, it->second.isDeleted);
+						nodeAg = AgentOnNodeInfo(agInfo->_nodeID, agInfo->_agentID, agInfo->isDeleted);//(it->second._nodeID,it->second._agentID, it->second.isDeleted);
 					}
 					catch(const std::runtime_error& re)
 					{
@@ -2139,7 +2124,7 @@ void SavingModelingData(int currentIteration, const string &filename)
 					try
 					{
 						iterationData.first = currentIteration;
-						iterationData.second[it->first] = pair<Vector2, AgentOnNodeInfo>(agentPosition, nodeAg);
+						iterationData.second[id] = pair<Vector2, AgentOnNodeInfo>(agentPosition, nodeAg);
 					}
 					catch(const std::runtime_error& re)
 					{
@@ -2221,6 +2206,7 @@ void SavingModelingData(int currentIteration, const string &filename)
 			//Writing to file if the current iteration is even to predefined
 			if(currentIteration %  iterationForWritingToFile == 0)
 			{
+				//WriteToFilePlainTextSavedModelingInfo(filename, simulationData);
 				WriteToFileBinarySavedModelingInfo(filename, simulationData);
 			}
 		}			

@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.IO;
+using System.Net.Configuration;
 using System.Security.Cryptography;
 using Microsoft.Xna.Framework;
 using Microsoft.Xna.Framework.Content;
@@ -63,26 +64,76 @@ namespace AgentsMovingVis
 
             string simDataPath = @"simData.txt";
             string json = "";
-            json = File.ReadAllText(simDataPath);
-            simulationData = JsonConvert.DeserializeObject<List<Iteration>>(json);
+            //json = File.ReadAllText(simDataPath);
+            //simulationData = JsonConvert.DeserializeObject<List<Iteration>>(json);
+
+            //simDataDictionary = new Dictionary<int, Dictionary<long, Agent>>();
+            //for (int i = 0; i < simulationData.Count; i++)
+            //{
+            //    Dictionary<long, Agent> agentsOnIteration = new Dictionary<long, Agent>();
+            //    for (int j = 0; j < simulationData[i].agents.Count; j++)
+            //    {
+            //        agentsOnIteration[simulationData[i].agents[j].agentID] = simulationData[i].agents[j];
+            //    }
+            //    simDataDictionary[simulationData[i].iteration] = agentsOnIteration;
+            //}
 
             simDataDictionary = new Dictionary<int, Dictionary<long, Agent>>();
-            for (int i = 0; i < simulationData.Count; i++)
+            string line = "";
+            StreamReader file = new StreamReader(@"testsimData.txt");
+            while ((line = file.ReadLine()) != null)
             {
+                int iterNum = Convert.ToInt32(line);
+
                 Dictionary<long, Agent> agentsOnIteration = new Dictionary<long, Agent>();
-                for (int j = 0; j < simulationData[i].agents.Count; j++)
+
+                line = file.ReadLine();
+                int agentsNum = Convert.ToInt32(line);
+                for (int i = 0; i < agentsNum; i++)
                 {
-                    agentsOnIteration[simulationData[i].agents[j].agentID] = simulationData[i].agents[j];
+                    line = file.ReadLine();
+                    int isDeleted = Convert.ToInt32(line);
+
+                    line = file.ReadLine();
+                    int agentId = Convert.ToInt32(line);
+
+                    line = file.ReadLine();
+                    float coordX = Convert.ToSingle(line.Replace('.', ','));
+
+                    line = file.ReadLine();
+                    float coordY = Convert.ToSingle(line.Replace('.', ','));
+
+                    Agent agent = new Agent();
+                    agent.X = coordX;
+                    agent.Y = coordY;
+                    agent.agentID = agentId;
+
+                    agentsOnIteration[agentId] = agent;
                 }
-                simDataDictionary[simulationData[i].iteration] = agentsOnIteration;
+                simDataDictionary[iterNum] = agentsOnIteration;
+            }
+
+            file.Close();
+
+            simulationData = new List<Iteration>();
+            foreach (var v in simDataDictionary)
+            {
+                var iteration = new Iteration();
+                iteration.iteration = v.Key;
+                iteration.agents = new List<Agent>();
+                foreach (var agent in v.Value)
+                {
+                    iteration.agents.Add(agent.Value);
+                }
+                simulationData.Add(iteration);
             }
 
 
-            string obstPath = @"Obstacles.txt";
+            string obstPath = @"test_obstacles.txt";
             json = File.ReadAllText(obstPath);
             obstacles = JsonConvert.DeserializeObject<List<Obstacle>>(json);
 
-            string subareasPath = @"areas.txt";
+            string subareasPath = @"test_areas.txt";
             json = File.ReadAllText(subareasPath);
             subareas = JsonConvert.DeserializeObject<List<Area>>(json);
 
